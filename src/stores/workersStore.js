@@ -1,4 +1,6 @@
+// src/stores/workersStore.js
 import { create } from "zustand";
+import { WORKER_SPECIALIZATIONS } from "../constants/gameConstants";
 
 /**
  * Workers Store
@@ -8,33 +10,46 @@ import { create } from "zustand";
  * - Assigned workers
  * - Worker specializations
  * - Worker productivity
+ *
+ * Fixed to correctly track available worker count
  */
 export const useWorkersStore = create((set, get) => ({
-  // Total workers
-  totalWorkers: 5,
+  // Total worker count
+  totalWorkerCount: 5,
 
-  // Unassigned available workers (count)
-  availableWorkerCount: 5,
+  // Available workers array (workers not assigned to buildings)
+  availableWorkers: [], // Format: [{ id: "worker_1" }]
 
-  // Unassigned available workers (array of worker objects with ids)
-  availableWorkers: [], // Format: [{ id: "worker_1", specialization: {...} }]
+  // Explicit count of available workers as a state value (not a getter)
+  availableWorkerCount: 0,
 
   // Assigned workers by territory and building
-  assignedWorkers: {}, // Format: { territoryId: { buildingIndex: [worker1, worker2, ...] } }
+  // Format: { territoryId: { buildingIndex: ["worker_1", "worker_2"] } }
+  assignedWorkers: {},
 
   // Worker specializations
-  workerSpecializations: {}, // Format: { workerId: { type: "diligent", subtype: "farming", bonus: 0.15 } }
+  // Format: { workerId: { type: "diligent", subtype: "farming", bonus: 0.15 } }
+  workerSpecializations: {},
 
   // Recently reassigned workers (with 50% productivity penalty)
-  recentlyReassigned: {}, // Format: { workerId: true }
+  // Format: { workerId: true }
+  recentlyReassigned: {},
 
   // Worker Actions
 
-  // Assign a worker to a building
+  /**
+   * Assign a worker to a building
+   * @param {string} territoryId - The territory ID
+   * @param {number} buildingIndex - The building index
+   * @param {string} workerId - The worker ID (optional, will use first available if not provided)
+   * @returns {boolean} Success status
+   */
   assignWorker: (territoryId, buildingIndex, workerId) => {
+    if (!territoryId || buildingIndex === undefined) return false;
+
     set((state) => {
       // Check if we have available workers
-      if (state.availableWorkerCount <= 0) return state;
+      if (state.availableWorkers.length === 0) return state;
 
       // If no specific worker ID provided, use the first available worker
       const workerToAssign =
@@ -46,22 +61,28 @@ export const useWorkersStore = create((set, get) => ({
       // If still no worker to assign, return the current state
       if (!workerToAssign) return state;
 
-      // Update assigned workers
-      const currentAssigned = state.assignedWorkers[territoryId] || {};
-      const currentBuildingWorkers = currentAssigned[buildingIndex] || [];
+      // Get current worker assignments for this territory or create empty object
+      const territoryWorkers = state.assignedWorkers[territoryId] || {};
 
-      // Check if building has capacity for more workers
-      // This would need to check the building level from mapStore
-      // For now, we'll assume a simple limit of 4 (max level building)
-      if (currentBuildingWorkers.length >= 4) return state;
+      // Get current workers for this building or create empty array
+      const buildingWorkers = territoryWorkers[buildingIndex] || [];
 
-      // Update assigned workers
-      const updatedAssigned = {
+      // Check if building already has this worker
+      if (buildingWorkers.includes(workerToAssign)) {
+        return state;
+      }
+
+      // Create updated lists
+      const updatedBuildingWorkers = [...buildingWorkers, workerToAssign];
+
+      const updatedTerritoryWorkers = {
+        ...territoryWorkers,
+        [buildingIndex]: updatedBuildingWorkers,
+      };
+
+      const updatedAssignedWorkers = {
         ...state.assignedWorkers,
-        [territoryId]: {
-          ...currentAssigned,
-          [buildingIndex]: [...currentBuildingWorkers, workerToAssign],
-        },
+        [territoryId]: updatedTerritoryWorkers,
       };
 
       // Remove the worker from available workers
@@ -70,17 +91,28 @@ export const useWorkersStore = create((set, get) => ({
       );
 
       return {
-        availableWorkerCount: state.availableWorkerCount - 1,
+        assignedWorkers: updatedAssignedWorkers,
         availableWorkers: updatedAvailableWorkers,
-        assignedWorkers: updatedAssigned,
+        // Update the availableWorkerCount explicitly
+        availableWorkerCount: updatedAvailableWorkers.length,
       };
     });
+
+    return true;
   },
 
-  // Unassign a worker from a building
+  /**
+   * Unassign a worker from a building
+   * @param {string} territoryId - The territory ID
+   * @param {number} buildingIndex - The building index
+   * @param {string} workerId - The worker ID
+   * @returns {boolean} Success status
+   */
   unassignWorker: (territoryId, buildingIndex, workerId) => {
+    if (!territoryId || buildingIndex === undefined || !workerId) return false;
+
     set((state) => {
-      // Check if the territory and building exist
+      // Check if territory and building exist in assignments
       if (
         !state.assignedWorkers[territoryId] ||
         !state.assignedWorkers[territoryId][buildingIndex]
@@ -101,26 +133,27 @@ export const useWorkersStore = create((set, get) => ({
         (id) => id !== workerId
       );
 
-      // Update the state
-      const updatedAssigned = { ...state.assignedWorkers };
+      // Create new territory workers object
+      const updatedTerritoryWorkers = { ...state.assignedWorkers[territoryId] };
 
+      // If no workers left in building, remove the building entry
       if (updatedBuildingWorkers.length === 0) {
-        // Remove the building entry if no workers left
-        delete updatedAssigned[territoryId][buildingIndex];
-
-        // Remove the territory entry if no buildings left
-        if (Object.keys(updatedAssigned[territoryId]).length === 0) {
-          delete updatedAssigned[territoryId];
-        }
+        delete updatedTerritoryWorkers[buildingIndex];
       } else {
-        // Update with remaining workers
-        updatedAssigned[territoryId] = {
-          ...updatedAssigned[territoryId],
-          [buildingIndex]: updatedBuildingWorkers,
-        };
+        updatedTerritoryWorkers[buildingIndex] = updatedBuildingWorkers;
       }
 
-      // Mark worker as recently reassigned
+      // Create new assigned workers object
+      const updatedAssignedWorkers = { ...state.assignedWorkers };
+
+      // If no buildings left in territory, remove the territory entry
+      if (Object.keys(updatedTerritoryWorkers).length === 0) {
+        delete updatedAssignedWorkers[territoryId];
+      } else {
+        updatedAssignedWorkers[territoryId] = updatedTerritoryWorkers;
+      }
+
+      // Mark worker as recently reassigned (50% productivity penalty)
       const updatedRecentlyReassigned = {
         ...state.recentlyReassigned,
         [workerId]: true,
@@ -133,63 +166,85 @@ export const useWorkersStore = create((set, get) => ({
       ];
 
       return {
-        availableWorkerCount: state.availableWorkerCount + 1,
+        assignedWorkers: updatedAssignedWorkers,
         availableWorkers: updatedAvailableWorkers,
-        assignedWorkers: updatedAssigned,
+        // Update the availableWorkerCount explicitly
+        availableWorkerCount: updatedAvailableWorkers.length,
         recentlyReassigned: updatedRecentlyReassigned,
       };
     });
+
+    return true;
   },
 
-  // Clear recently reassigned workers (call at end of turn)
+  /**
+   * Clear recently reassigned workers (call at end of turn)
+   */
   clearRecentlyReassigned: () => {
     set({ recentlyReassigned: {} });
   },
 
-  // Add a new worker (from population growth)
+  /**
+   * Add a new worker (from population growth)
+   * @returns {string} New worker ID
+   */
   addWorker: () => {
+    let newWorkerId = "";
+
     set((state) => {
-      const newWorkerId = `worker_${Date.now()}_${Math.floor(
-        Math.random() * 1000
-      )}`;
+      // Generate unique ID based on timestamp and random number
+      newWorkerId = `worker_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+      // Create updated workers lists
+      const updatedAvailableWorkers = [
+        ...state.availableWorkers,
+        { id: newWorkerId },
+      ];
 
       // Check if new worker gets a specialization (25% chance)
       const updatedSpecializations = { ...state.workerSpecializations };
 
       if (Math.random() < 0.25) {
         // Select specialization type
-        const types = [
-          { type: "diligent", subtypes: ["farming", "production", "gold"] },
-          {
-            type: "strong",
-            subtypes: ["military", "exploration", "construction"],
-          },
-          { type: "clever", subtypes: ["science", "espionage", "diplomacy"] },
-        ];
-
-        const selectedType = types[Math.floor(Math.random() * types.length)];
-        const selectedSubtype =
-          selectedType.subtypes[
-            Math.floor(Math.random() * selectedType.subtypes.length)
+        const specializationTypes = Object.keys(WORKER_SPECIALIZATIONS);
+        const selectedType =
+          specializationTypes[
+            Math.floor(Math.random() * specializationTypes.length)
           ];
 
+        // Select specialization subtype
+        const subtypes = WORKER_SPECIALIZATIONS[selectedType].subtypes;
+        const selectedSubtype =
+          subtypes[Math.floor(Math.random() * subtypes.length)];
+
+        // Add specialization to worker
         updatedSpecializations[newWorkerId] = {
-          type: selectedType.type,
+          type: selectedType,
           subtype: selectedSubtype,
           bonus: 0.15, // 15% bonus
         };
       }
 
       return {
-        totalWorkers: state.totalWorkers + 1,
-        availableWorkerCount: state.availableWorkerCount + 1,
-        availableWorkers: [...state.availableWorkers, { id: newWorkerId }],
+        totalWorkerCount: state.totalWorkerCount + 1,
+        availableWorkers: updatedAvailableWorkers,
+        // Update the availableWorkerCount explicitly
+        availableWorkerCount: updatedAvailableWorkers.length,
         workerSpecializations: updatedSpecializations,
       };
     });
+
+    return newWorkerId;
   },
 
-  // Calculate resource production for workers in a building
+  /**
+   * Calculate resource production for workers in a building
+   * @param {string} territoryId - The territory ID
+   * @param {number} buildingIndex - The building index
+   * @param {string} buildingType - The building type
+   * @param {number} buildingLevel - The building level
+   * @returns {Object} Production data { type, amount }
+   */
   calculateBuildingProduction: (
     territoryId,
     buildingIndex,
@@ -200,9 +255,9 @@ export const useWorkersStore = create((set, get) => ({
 
     // Get workers assigned to this building
     const workers = state.assignedWorkers[territoryId]?.[buildingIndex] || [];
-    if (workers.length === 0) return 0;
+    if (workers.length === 0) return { type: null, amount: 0 };
 
-    // Base production values per worker (would normally come from a config/data file)
+    // Base production values per worker
     const baseProductionValues = {
       farm: { type: "food", amount: 5 },
       mine: { type: "production", amount: 5 },
@@ -230,6 +285,7 @@ export const useWorkersStore = create((set, get) => ({
       // Apply specialization bonus if applicable
       const specialization = state.workerSpecializations[workerId];
       if (specialization) {
+        // Map building types to worker specializations
         const resourceMapping = {
           farm: "farming",
           mine: "production",
@@ -240,7 +296,10 @@ export const useWorkersStore = create((set, get) => ({
         const buildingResource = resourceMapping[buildingType];
 
         // Apply bonus if worker specialization matches building resource
-        if (specialization.subtype === buildingResource) {
+        if (
+          specialization.type === "diligent" &&
+          specialization.subtype === buildingResource
+        ) {
           workerProduction *= 1 + specialization.bonus;
         }
       }
@@ -263,7 +322,11 @@ export const useWorkersStore = create((set, get) => ({
     };
   },
 
-  // Get all building production values
+  /**
+   * Get all building production values
+   * @param {Object} territories - Map of territories
+   * @returns {Object} Map of resource types to production amounts
+   */
   getAllBuildingProduction: (territories) => {
     const state = get();
     const production = {};
@@ -275,6 +338,7 @@ export const useWorkersStore = create((set, get) => ({
 
         Object.entries(buildings).forEach(([buildingIndex, workers]) => {
           const buildingIndex_num = parseInt(buildingIndex, 10);
+
           if (territory.buildings && territory.buildings[buildingIndex_num]) {
             const building = territory.buildings[buildingIndex_num];
 
@@ -301,7 +365,10 @@ export const useWorkersStore = create((set, get) => ({
     return production;
   },
 
-  // Initialize workers (typically called at game start)
+  /**
+   * Initialize workers (typically called at game start)
+   * @param {number} count - Number of workers to initialize
+   */
   initializeWorkers: (count = 5) => {
     // Create initial workers with unique IDs and possible specializations
     const initialWorkers = [];
@@ -313,24 +380,23 @@ export const useWorkersStore = create((set, get) => ({
 
       // Give some initial workers specializations (25% chance)
       if (Math.random() < 0.25) {
-        // Select specialization type
-        const types = [
-          { type: "diligent", subtypes: ["farming", "production", "gold"] },
-          {
-            type: "strong",
-            subtypes: ["military", "exploration", "construction"],
-          },
-          { type: "clever", subtypes: ["science", "espionage", "diplomacy"] },
-        ];
+        // Select specialization type randomly
+        const specializationTypes = Object.keys(WORKER_SPECIALIZATIONS);
+        const selectedTypeKey =
+          specializationTypes[
+            Math.floor(Math.random() * specializationTypes.length)
+          ];
 
-        const selectedType = types[Math.floor(Math.random() * types.length)];
+        const selectedType = WORKER_SPECIALIZATIONS[selectedTypeKey];
+
+        // Select subtype randomly
         const selectedSubtype =
           selectedType.subtypes[
             Math.floor(Math.random() * selectedType.subtypes.length)
           ];
 
         specializations[workerId] = {
-          type: selectedType.type,
+          type: selectedTypeKey,
           subtype: selectedSubtype,
           bonus: 0.15, // 15% bonus
         };
@@ -338,13 +404,63 @@ export const useWorkersStore = create((set, get) => ({
     }
 
     set({
-      totalWorkers: count,
-      availableWorkerCount: count,
+      totalWorkerCount: count,
       availableWorkers: initialWorkers,
+      // Set the initial availableWorkerCount correctly
+      availableWorkerCount: initialWorkers.length,
       assignedWorkers: {},
       workerSpecializations: specializations,
       recentlyReassigned: {},
     });
+  },
+
+  /**
+   * Get workers by specialization
+   * @param {string} specializationType - Type of specialization to filter by
+   * @param {string} [subtype] - Optional subtype to further filter by
+   * @returns {Array} Matching workers
+   */
+  getWorkersBySpecialization: (specializationType, subtype = null) => {
+    const state = get();
+
+    return Object.entries(state.workerSpecializations)
+      .filter(([_, spec]) => {
+        // Match by type
+        if (spec.type !== specializationType) return false;
+
+        // If subtype is specified, match by that too
+        if (subtype !== null && spec.subtype !== subtype) return false;
+
+        return true;
+      })
+      .map(([workerId]) => {
+        // Check if worker is available or assigned
+        const isAvailable = state.availableWorkers.some(
+          (w) => w.id === workerId
+        );
+
+        // Find where the worker is assigned if not available
+        let assignment = null;
+
+        if (!isAvailable) {
+          Object.entries(state.assignedWorkers).forEach(
+            ([territoryId, buildings]) => {
+              Object.entries(buildings).forEach(([buildingIndex, workers]) => {
+                if (workers.includes(workerId)) {
+                  assignment = { territoryId, buildingIndex };
+                }
+              });
+            }
+          );
+        }
+
+        return {
+          id: workerId,
+          specialization: state.workerSpecializations[workerId],
+          isAvailable,
+          assignment,
+        };
+      });
   },
 }));
 

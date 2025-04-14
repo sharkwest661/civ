@@ -1,11 +1,32 @@
-import React, { useMemo } from "react";
+// src/components/technology/TechnologyTree.jsx
+import React, { useMemo, useCallback } from "react";
+import {
+  Box,
+  Heading,
+  Text,
+  Flex,
+  VStack,
+  Grid,
+  GridItem,
+  Badge,
+  Progress,
+  Divider,
+  Icon,
+  useToast,
+} from "@chakra-ui/react";
+import { Flask, Check, Beaker, History } from "lucide-react";
 import { useTechnologyStore } from "../../stores/technologyStore";
+import SharedButton from "../ui/SharedButton";
+import TechnologyTooltip from "./TechnologyTooltip";
 
 /**
  * TechnologyTree component for visualizing and managing technology research
+ * Refactored to use Chakra UI components
  */
 const TechnologyTree = React.memo(({ onClose }) => {
-  // Get technology data from the store
+  const toast = useToast();
+
+  // Get technology data from the store with individual selectors
   const technologies = useTechnologyStore((state) => state.technologies);
   const currentResearch = useTechnologyStore((state) => state.currentResearch);
   const startResearch = useTechnologyStore((state) => state.startResearch);
@@ -41,326 +62,363 @@ const TechnologyTree = React.memo(({ onClose }) => {
     return sortedResult;
   }, [technologies]);
 
-  // Function to check if a technology can be researched
-  const canResearch = (tech) => {
-    if (tech.researched) return false;
+  // Check if a technology can be researched
+  const canResearch = useCallback(
+    (tech) => {
+      if (tech.researched) return false;
+      if (currentResearch) return false;
 
-    // Check if all requirements are researched
-    return tech.requirements.every((reqId) => technologies[reqId]?.researched);
-  };
+      // Check if all requirements are met
+      return tech.requirements.every(
+        (reqId) => technologies[reqId]?.researched
+      );
+    },
+    [technologies, currentResearch]
+  );
 
   // Handle clicking on a technology
-  const handleTechClick = (tech) => {
-    if (!canResearch(tech)) return;
+  const handleTechClick = useCallback(
+    (tech) => {
+      if (!canResearch(tech)) {
+        // Show why research can't be started
+        if (tech.researched) {
+          toast({
+            title: "Already Researched",
+            description: `${tech.name} has already been researched.`,
+            status: "info",
+            duration: 3000,
+            isClosable: true,
+          });
+        } else if (currentResearch) {
+          toast({
+            title: "Research in Progress",
+            description: "You're already researching another technology.",
+            status: "warning",
+            duration: 3000,
+            isClosable: true,
+          });
+        } else {
+          toast({
+            title: "Requirements Not Met",
+            description: "You need to research the prerequisites first.",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+        return;
+      }
 
-    // Start researching this tech
-    startResearch(tech.id);
-  };
+      // Start researching this tech
+      startResearch(tech.id);
+
+      toast({
+        title: "Research Started",
+        description: `Started researching ${tech.name}.`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    },
+    [canResearch, currentResearch, startResearch, technologies, toast]
+  );
 
   // Handle canceling research
-  const handleCancelResearch = () => {
+  const handleCancelResearch = useCallback(() => {
     cancelResearch();
-  };
+
+    toast({
+      title: "Research Canceled",
+      description: "Current research has been canceled.",
+      status: "info",
+      duration: 3000,
+      isClosable: true,
+    });
+  }, [cancelResearch, toast]);
+
+  // Get color for era label
+  const getEraColor = useCallback((era) => {
+    switch (era) {
+      case "Primitive":
+        return "resource.food"; // Green
+      case "Ancient":
+        return "resource.production"; // Orange
+      case "Classical":
+        return "resource.science"; // Blue
+      case "Medieval":
+        return "resource.happiness"; // Red
+      case "Renaissance":
+        return "resource.gold"; // Yellow
+      default:
+        return "text.primary";
+    }
+  }, []);
+
+  // Get color for technology type
+  const getTechColor = useCallback(
+    (tech) => {
+      if (tech.researched) {
+        return "status.success"; // Completed research
+      }
+
+      if (tech.id === currentResearch) {
+        return "resource.science"; // Active research
+      }
+
+      if (canResearch(tech)) {
+        return "text.primary"; // Available to research
+      }
+
+      return "text.secondary"; // Unavailable
+    },
+    [canResearch, currentResearch]
+  );
 
   return (
-    <div
-      className="technology-tree"
-      style={{
-        padding: "20px",
-        background: "#131e2d",
-        borderRadius: "4px",
-        border: "1px solid #2a3c53",
-        maxHeight: "80vh",
-        overflowY: "auto",
-        width: "800px",
-        maxWidth: "90vw",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "20px",
-        }}
-      >
-        <h3 style={{ color: "#e6c570", margin: 0, fontSize: "24px" }}>
+    <Box p={5} maxH="80vh" overflowY="auto">
+      <Flex justify="space-between" align="center" mb={5}>
+        <Heading size="lg" color="accent.main">
           Technology Tree
-        </h3>
-        <button
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "#8a9bbd",
-            cursor: "pointer",
-            fontSize: "24px",
-          }}
+        </Heading>
+        <SharedButton
+          variant="ghost"
+          size="sm"
           onClick={onClose}
+          aria-label="Close panel"
         >
-          ×
-        </button>
-      </div>
+          ✕
+        </SharedButton>
+      </Flex>
 
       {/* Current research display */}
-      <div
-        style={{
-          background: "#1a2634",
-          padding: "15px",
-          borderRadius: "4px",
-          marginBottom: "20px",
-        }}
-      >
-        <h4 style={{ color: "#e1e1e1", margin: "0 0 10px 0" }}>
+      <Box bg="background.ui" p={4} borderRadius="md" mb={5}>
+        <Heading size="md" color="text.primary" mb={3}>
           Current Research
-        </h4>
+        </Heading>
+
         {currentResearch ? (
-          <div style={{ marginBottom: "10px" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <p style={{ color: "#5ea8ed", margin: "0 0 5px 0" }}>
-                {technologies[currentResearch].name}
-              </p>
-              <button
-                style={{
-                  background: "#2a3c53",
-                  border: "none",
-                  borderRadius: "4px",
-                  padding: "5px 10px",
-                  color: "#e1e1e1",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                }}
+          <VStack align="stretch" spacing={2}>
+            <Flex justify="space-between" align="center">
+              <Flex align="center">
+                <Icon as={Flask} color="resource.science" mr={2} />
+                <Text color="resource.science" fontWeight="bold">
+                  {technologies[currentResearch].name}
+                </Text>
+              </Flex>
+
+              <SharedButton
+                variant="ghost"
+                size="sm"
+                colorScheme="red"
                 onClick={handleCancelResearch}
               >
                 Cancel
-              </button>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <p style={{ color: "#8a9bbd", margin: "0 0 5px 0" }}>
-                {technologies[currentResearch].description}
-              </p>
-              <p style={{ color: "#8a9bbd", margin: 0 }}>
-                {technologies[currentResearch].progress}/
-                {technologies[currentResearch].cost}{" "}
-                <span style={{ color: "#5ea8ed" }}>🔬</span>
-              </p>
-            </div>
-            <div
-              style={{
-                width: "100%",
-                height: "8px",
-                background: "#2a3c53",
-                borderRadius: "4px",
-                overflow: "hidden",
-                marginTop: "5px",
-              }}
-            >
-              <div
-                style={{
-                  width: `${
-                    (technologies[currentResearch].progress /
-                      technologies[currentResearch].cost) *
-                    100
-                  }%`,
-                  height: "100%",
-                  background: "#5ea8ed",
-                  borderRadius: "4px",
-                }}
-              ></div>
-            </div>
-          </div>
+              </SharedButton>
+            </Flex>
+
+            <Text fontSize="sm" color="text.secondary">
+              {technologies[currentResearch].description}
+            </Text>
+
+            <Flex justify="space-between" align="center" mt={1}>
+              <Text fontSize="sm" color="text.secondary">
+                Progress:
+              </Text>
+              <Text fontSize="sm" color="resource.science">
+                {technologies[currentResearch].progress} /{" "}
+                {technologies[currentResearch].cost}
+                <Icon as={Beaker} boxSize={4} ml={1} />
+              </Text>
+            </Flex>
+
+            <Progress
+              value={
+                (technologies[currentResearch].progress /
+                  technologies[currentResearch].cost) *
+                100
+              }
+              colorScheme="blue"
+              size="sm"
+              borderRadius="full"
+              mt={1}
+            />
+          </VStack>
         ) : (
-          <p style={{ color: "#8a9bbd" }}>No active research</p>
+          <Text color="text.secondary">
+            No technology currently being researched. Select a technology below
+            to begin research.
+          </Text>
         )}
-      </div>
+      </Box>
 
       {/* Technology tree by era */}
       {Object.entries(techByEra).map(([era, techs]) => (
-        <div key={era} style={{ marginBottom: "30px" }}>
-          <h4
-            style={{
-              color: "#e6c570",
-              margin: "0 0 15px 0",
-              padding: "5px 0",
-              borderBottom: "1px solid #2a3c53",
-            }}
+        <Box key={era} mb={8}>
+          <Flex
+            align="center"
+            mb={3}
+            pb={1}
+            borderBottomWidth="1px"
+            borderColor="background.highlight"
           >
-            {era} Era
-          </h4>
+            <Box
+              bg={`${getEraColor(era)}20`}
+              color={getEraColor(era)}
+              px={2}
+              py={0.5}
+              borderRadius="md"
+              fontSize="sm"
+              fontWeight="bold"
+              mr={2}
+            >
+              {era}
+            </Box>
+            <Heading size="md" color="accent.main">
+              Era
+            </Heading>
+          </Flex>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "15px" }}>
+          <Grid templateColumns="repeat(auto-fill, minmax(230px, 1fr))" gap={4}>
             {techs.map((tech) => {
-              const researchable = canResearch(tech);
+              const isResearchable = canResearch(tech);
               const isResearched = tech.researched;
               const isCurrentlyResearching = currentResearch === tech.id;
+              const textColor = getTechColor(tech);
 
               return (
-                <div
-                  key={tech.id}
-                  style={{
-                    width: "230px",
-                    padding: "15px",
-                    background: isResearched
-                      ? "#2e4c34"
-                      : isCurrentlyResearching
-                      ? "#3e2e4c"
-                      : researchable
-                      ? "#1e2d42"
-                      : "#31394a",
-                    borderRadius: "4px",
-                    opacity:
-                      researchable || isResearched || isCurrentlyResearching
-                        ? 1
-                        : 0.7,
-                    cursor:
-                      researchable && !isCurrentlyResearching
-                        ? "pointer"
-                        : "default",
-                    border: isCurrentlyResearching
-                      ? "1px solid #5ea8ed"
-                      : "1px solid transparent",
-                  }}
-                  onClick={() => handleTechClick(tech)}
-                >
-                  <h5
-                    style={{
-                      color: isResearched
-                        ? "#7dce82"
+                <GridItem key={tech.id}>
+                  <Box
+                    bg={
+                      isResearched
+                        ? "background.ui"
                         : isCurrentlyResearching
-                        ? "#5ea8ed"
-                        : "#e1e1e1",
-                      margin: "0 0 10px 0",
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
+                        ? "background.highlight"
+                        : "background.ui"
+                    }
+                    borderWidth="1px"
+                    borderColor={
+                      isResearched
+                        ? "status.success"
+                        : isCurrentlyResearching
+                        ? "resource.science"
+                        : isResearchable
+                        ? "background.highlight"
+                        : "transparent"
+                    }
+                    borderRadius="md"
+                    p={3}
+                    cursor={isResearchable ? "pointer" : "default"}
+                    onClick={() => handleTechClick(tech)}
+                    _hover={
+                      isResearchable ? { borderColor: "accent.main" } : {}
+                    }
+                    opacity={
+                      isResearchable || isResearched || isCurrentlyResearching
+                        ? 1
+                        : 0.7
+                    }
+                    transition="all 0.2s"
                   >
-                    {tech.name}
-                    {isResearched && <span>✓</span>}
-                    {isCurrentlyResearching && <span>🔬</span>}
-                  </h5>
+                    <Flex justify="space-between" align="center" mb={2}>
+                      <Text fontWeight="bold" color={textColor}>
+                        {tech.name}
+                      </Text>
 
-                  <p
-                    style={{
-                      color: "#8a9bbd",
-                      fontSize: "12px",
-                      margin: "0 0 10px 0",
-                    }}
-                  >
-                    {tech.description}
-                  </p>
+                      {isResearched && (
+                        <Icon as={Check} color="status.success" boxSize={5} />
+                      )}
 
-                  {tech.requirements.length > 0 && (
-                    <div style={{ margin: "10px 0" }}>
-                      <p
-                        style={{
-                          color: "#8a9bbd",
-                          fontSize: "11px",
-                          margin: "0 0 5px 0",
-                        }}
-                      >
-                        Requirements:
-                      </p>
-                      <ul
-                        style={{
-                          margin: 0,
-                          padding: "0 0 0 15px",
-                          fontSize: "11px",
-                          color: "#8a9bbd",
-                        }}
-                      >
+                      {isCurrentlyResearching && (
+                        <Icon
+                          as={History}
+                          color="resource.science"
+                          boxSize={5}
+                        />
+                      )}
+                    </Flex>
+
+                    <Text
+                      fontSize="xs"
+                      color="text.secondary"
+                      mb={2}
+                      noOfLines={2}
+                    >
+                      {tech.description}
+                    </Text>
+
+                    {/* Requirements */}
+                    {tech.requirements.length > 0 && (
+                      <VStack align="start" spacing={1} mb={2}>
+                        <Text fontSize="xs" color="text.secondary">
+                          Requirements:
+                        </Text>
+
                         {tech.requirements.map((reqId) => {
                           const reqTech = technologies[reqId];
                           const isReqResearched = reqTech?.researched;
 
                           return (
-                            <li
+                            <Flex
                               key={reqId}
-                              style={{
-                                color: isReqResearched ? "#7dce82" : "#d65959",
-                              }}
+                              align="center"
+                              fontSize="xs"
+                              color={
+                                isReqResearched
+                                  ? "status.success"
+                                  : "status.danger"
+                              }
                             >
+                              <Box
+                                w="2px"
+                                h="2px"
+                                borderRadius="full"
+                                bg={
+                                  isReqResearched
+                                    ? "status.success"
+                                    : "status.danger"
+                                }
+                                mr={1}
+                              />
                               {reqTech?.name || reqId}
-                            </li>
+                              {isReqResearched && (
+                                <Icon as={Check} boxSize={3} ml={1} />
+                              )}
+                            </Flex>
                           );
                         })}
-                      </ul>
-                    </div>
-                  )}
+                      </VStack>
+                    )}
 
-                  <div style={{ margin: "10px 0 0 0" }}>
-                    <p
-                      style={{
-                        color: "#8a9bbd",
-                        fontSize: "11px",
-                        margin: "0 0 5px 0",
-                      }}
-                    >
-                      Effects:
-                    </p>
-                    <ul
-                      style={{
-                        margin: 0,
-                        padding: "0 0 0 15px",
-                        fontSize: "11px",
-                        color: "#e1e1e1",
-                      }}
-                    >
-                      {tech.effects.map((effect, index) => (
-                        <li key={index}>{effect}</li>
-                      ))}
-                    </ul>
-                  </div>
+                    {/* Research cost */}
+                    {!isResearched && (
+                      <Flex justify="flex-end" align="center" mt={2}>
+                        <Text
+                          fontSize="xs"
+                          color="resource.science"
+                          fontWeight="medium"
+                        >
+                          {tech.cost} <Icon as={Beaker} boxSize={3} ml={0.5} />
+                        </Text>
+                      </Flex>
+                    )}
 
-                  {!isResearched && (
-                    <div
-                      style={{
-                        marginTop: "10px",
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        alignItems: "center",
-                        gap: "5px",
-                      }}
-                    >
-                      <span style={{ color: "#5ea8ed", fontSize: "14px" }}>
-                        🔬
-                      </span>
-                      <span style={{ color: "#e1e1e1" }}>{tech.cost}</span>
-                    </div>
-                  )}
-
-                  {tech.progress > 0 && !isResearched && (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "4px",
-                        background: "#2a3c53",
-                        borderRadius: "2px",
-                        overflow: "hidden",
-                        marginTop: "10px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${(tech.progress / tech.cost) * 100}%`,
-                          height: "100%",
-                          background: "#5ea8ed",
-                          borderRadius: "2px",
-                        }}
-                      ></div>
-                    </div>
-                  )}
-                </div>
+                    {/* Research progress indicator */}
+                    {tech.progress > 0 && !isResearched && (
+                      <Progress
+                        value={(tech.progress / tech.cost) * 100}
+                        size="xs"
+                        colorScheme="blue"
+                        mt={2}
+                      />
+                    )}
+                  </Box>
+                </GridItem>
               );
             })}
-          </div>
-        </div>
+          </Grid>
+        </Box>
       ))}
-    </div>
+    </Box>
   );
 });
 

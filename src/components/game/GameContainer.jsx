@@ -1,17 +1,40 @@
+// src/components/game/GameContainer.jsx
 import React, { useEffect, useState, useCallback } from "react";
+import {
+  Box,
+  Flex,
+  Heading,
+  Text,
+  VStack,
+  HStack,
+  IconButton,
+  Divider,
+} from "@chakra-ui/react";
+import {
+  Users,
+  Building,
+  FlaskConical,
+  Sword,
+  MessageCircle,
+  X,
+} from "lucide-react";
 import MapView from "../map/MapView";
 import ResourcePanel from "../resources/ResourcePanel";
 import TurnControls from "./TurnControls";
 import BuildingPanel from "../buildings/BuildingPanel";
 import TechnologyTree from "../technology/TechnologyTree";
 import WorkerAssignmentPanel from "../workers/WorkerAssignmentPanel";
+import SharedButton from "../ui/SharedButton";
+import SharedPanel from "../ui/SharedPanel";
 import { useGameStore } from "../../stores/gameStore";
 import { useMapStore } from "../../stores/mapStore";
 import { useResourcesStore } from "../../stores/resourcesStore";
 import { useWorkersStore } from "../../stores/workersStore";
+import { hexToId } from "../../utils/hexUtils";
 
 /**
  * GameContainer is the main component that brings together all game elements
+ * Updated to use refactored stores correctly
  */
 const GameContainer = () => {
   // Component state
@@ -31,12 +54,15 @@ const GameContainer = () => {
   const selectTerritory = useMapStore((state) => state.selectTerritory);
 
   // Resources store selectors
-  const resources = useResourcesStore((state) => state.resources);
+  // Update to use the refactored resource store structure
+  const setResourceProduction = useResourcesStore(
+    (state) => state.setResourceProduction
+  );
   const updateAllResources = useResourcesStore(
     (state) => state.updateAllResources
   );
-  const setResourceProduction = useResourcesStore(
-    (state) => state.setResourceProduction
+  const setResourceProductionRates = useResourcesStore(
+    (state) => state.setResourceProductionRates
   );
 
   // Workers store selectors
@@ -60,10 +86,8 @@ const GameContainer = () => {
     // Calculate production from workers
     const workerProduction = getAllBuildingProduction(territories);
 
-    // Update resource production rates
-    Object.entries(workerProduction).forEach(([resourceType, amount]) => {
-      setResourceProduction(resourceType, amount);
-    });
+    // Update resource production rates - use new bulk update function
+    setResourceProductionRates(workerProduction);
 
     // Update all resources based on production
     updateAllResources();
@@ -79,7 +103,7 @@ const GameContainer = () => {
     clearRecentlyReassigned,
     getAllBuildingProduction,
     territories,
-    setResourceProduction,
+    setResourceProductionRates,
   ]);
 
   // Handle phase change - memoize with useCallback
@@ -121,6 +145,32 @@ const GameContainer = () => {
     document.title = "Empire's Legacy";
   }, []);
 
+  // Get phase button variant based on current phase
+  const getPhaseButtonVariant = useCallback(
+    (phase) => {
+      return currentPhase === phase ? "primary" : "secondary";
+    },
+    [currentPhase]
+  );
+
+  // Get phase icon based on phase name
+  const getPhaseIcon = useCallback((phase) => {
+    switch (phase) {
+      case "Assignment":
+        return Users;
+      case "Building":
+        return Building;
+      case "Research":
+        return FlaskConical;
+      case "Military":
+        return Sword;
+      case "Diplomacy":
+        return MessageCircle;
+      default:
+        return null;
+    }
+  }, []);
+
   // Render the appropriate side panel
   const renderSidePanel = () => {
     switch (activeSidePanel) {
@@ -142,334 +192,222 @@ const GameContainer = () => {
 
       case "military":
         return (
-          <div className="panel-placeholder" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#e6c570", marginBottom: "15px" }}>
-              Military Panel
-            </h3>
-            <p style={{ color: "#8a9bbd" }}>
+          <Box p={4}>
+            <Flex justify="space-between" align="center" mb={4}>
+              <Heading size="md" color="accent.main">
+                Military Panel
+              </Heading>
+              <IconButton
+                icon={<X size={18} />}
+                aria-label="Close panel"
+                variant="ghost"
+                onClick={() => setActiveSidePanel(null)}
+              />
+            </Flex>
+            <Text color="text.secondary">
               Military panel would be implemented here.
-            </p>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#8a9bbd",
-                cursor: "pointer",
-                position: "absolute",
-                top: "15px",
-                right: "15px",
-                fontSize: "20px",
-              }}
-              onClick={() => setActiveSidePanel(null)}
-            >
-              ×
-            </button>
-          </div>
+            </Text>
+          </Box>
         );
 
       case "diplomacy":
         return (
-          <div className="panel-placeholder" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#e6c570", marginBottom: "15px" }}>
-              Diplomacy Panel
-            </h3>
-            <p style={{ color: "#8a9bbd" }}>
+          <Box p={4}>
+            <Flex justify="space-between" align="center" mb={4}>
+              <Heading size="md" color="accent.main">
+                Diplomacy Panel
+              </Heading>
+              <IconButton
+                icon={<X size={18} />}
+                aria-label="Close panel"
+                variant="ghost"
+                onClick={() => setActiveSidePanel(null)}
+              />
+            </Flex>
+            <Text color="text.secondary">
               Diplomacy panel would be implemented here.
-            </p>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#8a9bbd",
-                cursor: "pointer",
-                position: "absolute",
-                top: "15px",
-                right: "15px",
-                fontSize: "20px",
-              }}
-              onClick={() => setActiveSidePanel(null)}
-            >
-              ×
-            </button>
-          </div>
+            </Text>
+          </Box>
         );
 
       default:
         return (
-          <div
-            className="side-panel-default"
-            style={{
-              padding: "20px",
-            }}
-          >
-            <h3
-              style={{
-                color: "#e6c570",
-                margin: "0 0 20px 0",
-                fontSize: "20px",
-              }}
-            >
+          <Box p={4}>
+            <Heading size="md" color="accent.main" mb={5}>
               Actions
-            </h3>
+            </Heading>
 
-            <div
-              className="action-buttons"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-              }}
-            >
-              <button
-                style={{
-                  background: "#e6c570",
-                  border: "none",
-                  borderRadius: "4px",
-                  padding: "10px 15px",
-                  color: "#131e2d",
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
+            <VStack spacing={3} align="stretch" mb={6}>
+              <SharedButton
                 onClick={() => toggleSidePanel("workers")}
+                variant="primary"
+                leftIcon={<Users size={18} />}
               >
                 Assign Workers
-              </button>
+              </SharedButton>
 
-              <button
-                style={{
-                  background: "#2a3c53",
-                  border: "none",
-                  borderRadius: "4px",
-                  padding: "10px 15px",
-                  color: "#e1e1e1",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
+              <SharedButton
                 onClick={() => toggleSidePanel("building")}
+                variant="secondary"
+                leftIcon={<Building size={18} />}
               >
                 Build Structure
-              </button>
+              </SharedButton>
 
-              <button
-                style={{
-                  background: "#2a3c53",
-                  border: "none",
-                  borderRadius: "4px",
-                  padding: "10px 15px",
-                  color: "#e1e1e1",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
+              <SharedButton
                 onClick={() => toggleSidePanel("tech")}
+                variant="secondary"
+                leftIcon={<FlaskConical size={18} />}
               >
                 Research Technology
-              </button>
+              </SharedButton>
 
-              <button
-                style={{
-                  background: "#2a3c53",
-                  border: "none",
-                  borderRadius: "4px",
-                  padding: "10px 15px",
-                  color: "#e1e1e1",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
+              <SharedButton
                 onClick={() => toggleSidePanel("military")}
+                variant="secondary"
+                leftIcon={<Sword size={18} />}
               >
                 Military Operations
-              </button>
+              </SharedButton>
 
-              <button
-                style={{
-                  background: "#2a3c53",
-                  border: "none",
-                  borderRadius: "4px",
-                  padding: "10px 15px",
-                  color: "#e1e1e1",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
+              <SharedButton
                 onClick={() => toggleSidePanel("diplomacy")}
+                variant="secondary"
+                leftIcon={<MessageCircle size={18} />}
               >
                 Diplomacy
-              </button>
-            </div>
+              </SharedButton>
+            </VStack>
 
             {selectedTerritory && (
-              <div
-                style={{
-                  marginTop: "30px",
-                  padding: "15px",
-                  background: "#1a2634",
-                  borderRadius: "4px",
-                  border: "1px solid #2a3c53",
-                }}
-              >
-                <h4 style={{ color: "#e1e1e1", margin: "0 0 10px 0" }}>
-                  Selected Territory
-                </h4>
-                <p style={{ color: "#8a9bbd", margin: "5px 0" }}>
-                  Coordinates: ({selectedTerritory.q}, {selectedTerritory.r})
-                </p>
-                {selectedTerritory.territory && (
-                  <>
-                    {selectedTerritory.territory.type && (
-                      <p style={{ color: "#8a9bbd", margin: "5px 0" }}>
-                        Type:{" "}
-                        {selectedTerritory.territory.type
-                          .charAt(0)
-                          .toUpperCase() +
-                          selectedTerritory.territory.type.slice(1)}
-                      </p>
+              <Box mt={4}>
+                <SharedPanel title="Selected Territory">
+                  <VStack align="stretch" spacing={1}>
+                    <Text fontSize="sm">
+                      Coordinates: ({selectedTerritory.q}, {selectedTerritory.r}
+                      )
+                    </Text>
+
+                    {selectedTerritory.territory && (
+                      <>
+                        {selectedTerritory.territory.type && (
+                          <Text fontSize="sm">
+                            Type:{" "}
+                            {selectedTerritory.territory.type
+                              .charAt(0)
+                              .toUpperCase() +
+                              selectedTerritory.territory.type.slice(1)}
+                          </Text>
+                        )}
+
+                        {selectedTerritory.territory.resource && (
+                          <Text fontSize="sm">
+                            Resource: {selectedTerritory.territory.resource}
+                          </Text>
+                        )}
+                      </>
                     )}
-                    {selectedTerritory.territory.resource && (
-                      <p style={{ color: "#8a9bbd", margin: "5px 0" }}>
-                        Resource: {selectedTerritory.territory.resource}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+                  </VStack>
+                </SharedPanel>
+              </Box>
             )}
-          </div>
+          </Box>
         );
     }
   };
 
   return (
-    <div
-      className="game-container"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "100vw",
-        background: "#1a2634", // Background color from design doc
-        color: "#e1e1e1", // Text color from design doc
-      }}
+    <Flex
+      direction="column"
+      height="100vh"
+      width="100vw"
+      bg="background.main"
+      color="text.primary"
+      data-testid="game-container"
+      overflow="hidden" // Important to prevent scrollbars
     >
       {/* Top Bar with Resources and Controls */}
-      <div
-        className="top-bar"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "10px 20px",
-          background: "#131e2d", // Panel color from design doc
-          borderBottom: "1px solid #2a3c53",
-        }}
+      <Flex
+        justify="space-between"
+        p={3}
+        bg="background.panel"
+        borderBottomWidth="1px"
+        borderColor="background.highlight"
       >
-        <div className="game-info">
-          <h1
-            style={{
-              color: "#e6c570", // Gold color from design doc
-              margin: "0",
-              fontSize: "24px",
-            }}
-          >
+        <Box>
+          <Heading size="md" color="accent.main" mb={1}>
             Empire's Legacy
-          </h1>
-          <div
-            style={{
-              fontSize: "14px",
-              color: "#8a9bbd", // Text secondary from design doc
-            }}
-          >
+          </Heading>
+          <Text fontSize="sm" color="text.secondary">
             Turn: {currentTurn} | Phase: {currentPhase}
-          </div>
-        </div>
+          </Text>
+        </Box>
 
-        <ResourcePanel resources={resources} />
-      </div>
+        <ResourcePanel />
+      </Flex>
 
       {/* Main Content Area */}
-      <div
-        className="main-content"
-        style={{
-          display: "flex",
-          flex: 1,
-          overflow: "hidden",
-        }}
-      >
+      <Flex flex="1" overflow="hidden">
         {/* Main Map Area */}
-        <div
-          className="map-area"
-          style={{
-            flex: 1,
-            position: "relative",
-          }}
+        <Box
+          flex="1"
+          position="relative"
+          overflow="hidden"
+          data-testid="map-container"
         >
           <MapView
             territories={territories}
             onTerritorySelect={handleTerritorySelect}
             currentPlayer={currentPlayer}
           />
-        </div>
+        </Box>
 
         {/* Side Panel */}
-        <div
-          className="side-panel"
-          style={{
-            width: "550px",
-            background: "#131e2d", // Panel color from design doc
-            borderLeft: "1px solid #2a3c53",
-            padding: "0",
-            overflowY: "auto",
-            position: "relative",
-          }}
+        <Box
+          w="550px"
+          bg="background.panel"
+          borderLeftWidth="1px"
+          borderColor="background.highlight"
+          overflowY="auto"
+          position="relative"
         >
           {renderSidePanel()}
-        </div>
-      </div>
+        </Box>
+      </Flex>
 
       {/* Bottom Bar with Turn Controls */}
-      <div
-        className="bottom-bar"
-        style={{
-          padding: "10px 20px",
-          background: "#131e2d", // Panel color from design doc
-          borderTop: "1px solid #2a3c53",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+      <Flex
+        p={3}
+        bg="background.panel"
+        borderTopWidth="1px"
+        borderColor="background.highlight"
+        justify="space-between"
+        align="center"
       >
-        <div className="phase-controls">
+        <Flex gap={2}>
           {/* Phase buttons */}
-          <div style={{ display: "flex", gap: "10px" }}>
-            {[
-              "Assignment",
-              "Building",
-              "Research",
-              "Military",
-              "Diplomacy",
-            ].map((phase) => (
-              <button
-                key={phase}
-                onClick={() => handlePhaseChange(phase)}
-                style={{
-                  background:
-                    currentPhase === phase ? "#2a3c53" : "transparent",
-                  border: "1px solid #2a3c53",
-                  borderRadius: "4px",
-                  padding: "5px 10px",
-                  color: currentPhase === phase ? "#e6c570" : "#8a9bbd",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
-              >
-                {phase}
-              </button>
-            ))}
-          </div>
-        </div>
+          {["Assignment", "Building", "Research", "Military", "Diplomacy"].map(
+            (phase) => {
+              const PhaseIcon = getPhaseIcon(phase);
+              return (
+                <SharedButton
+                  key={phase}
+                  onClick={() => handlePhaseChange(phase)}
+                  variant={getPhaseButtonVariant(phase)}
+                  size="sm"
+                  leftIcon={PhaseIcon && <PhaseIcon size={16} />}
+                >
+                  {phase}
+                </SharedButton>
+              );
+            }
+          )}
+        </Flex>
 
         <TurnControls onEndTurn={handleEndTurn} />
-      </div>
-    </div>
+      </Flex>
+    </Flex>
   );
 };
 
-export default React.memo(GameContainer); // Memoize to prevent unnecessary re-renders
+export default React.memo(GameContainer);

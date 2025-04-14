@@ -1,32 +1,28 @@
+// src/components/game/TurnControls.jsx
 import React from "react";
+import { Flex, Icon } from "@chakra-ui/react";
+import { ArrowRight } from "lucide-react";
+import SharedButton from "../ui/SharedButton";
 
 /**
  * TurnControls component provides controls for ending the current turn
+ * Updated to use our shared Chakra UI components
  */
-const TurnControls = ({ onEndTurn = () => {} }) => {
+const TurnControls = React.memo(({ onEndTurn = () => {} }) => {
   return (
-    <div className="turn-controls">
-      <button
+    <Flex className="turn-controls" justify="flex-end">
+      <SharedButton
         onClick={onEndTurn}
-        style={{
-          background: "#e6c570", // Gold color from design doc
-          border: "none",
-          borderRadius: "4px",
-          padding: "10px 20px",
-          color: "#131e2d",
-          fontSize: "16px",
-          fontWeight: "bold",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-        }}
+        variant="primary"
+        rightIcon={<Icon as={ArrowRight} boxSize={5} />}
       >
-        <span>End Turn</span>
-        <span style={{ fontSize: "20px" }}>➔</span>
-      </button>
-    </div>
+        End Turn
+      </SharedButton>
+    </Flex>
   );
-};
+});
+
+// Add display name for debugging
+TurnControls.displayName = "TurnControls";
 
 export default TurnControls;
