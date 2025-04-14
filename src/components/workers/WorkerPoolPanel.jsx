@@ -1,23 +1,27 @@
+// src/components/workers/WorkerPoolPanel.jsx
 import React, { useState } from "react";
 import {
   Box,
-  Heading,
   Text,
   Flex,
   SimpleGrid,
   Badge,
-  Button,
   Divider,
   Tooltip,
+  VStack,
+  Heading,
+  Icon,
 } from "@chakra-ui/react";
-import { User, Users } from "lucide-react";
+import { User, Users, Brain, Briefcase, CheckCircle } from "lucide-react";
 import { useWorkersStore } from "../../stores/workersStore";
+import SharedButton from "../ui/SharedButton";
 
 /**
  * WorkerPoolPanel component shows all available workers and allows selecting them
+ * Updated to use our Chakra UI components and fix modal issues
  */
 const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
-  // Get worker data from workers store
+  // Get worker data from workers store using individual selectors
   const availableWorkers = useWorkersStore((state) => state.availableWorkers);
   const workerSpecializations = useWorkersStore(
     (state) => state.workerSpecializations
@@ -29,14 +33,6 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
   // Local state for selected worker
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
 
-  // Handle worker selection
-  const handleSelectWorker = (workerId) => {
-    setSelectedWorkerId(workerId);
-    if (onSelectWorker) {
-      onSelectWorker(workerId);
-    }
-  };
-
   // Get specialization info for a worker
   const getSpecializationInfo = (workerId) => {
     const specialization = workerSpecializations[workerId];
@@ -46,20 +42,20 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
 
     switch (specialization.type) {
       case "diligent":
-        icon = "💼";
-        color = "#e9d16c"; // Gold
+        icon = Briefcase;
+        color = "resource.gold"; // Gold
         name = "Diligent";
         description = `+15% ${specialization.subtype} production`;
         break;
       case "strong":
-        icon = "💪";
-        color = "#d68c45"; // Orange
+        icon = User;
+        color = "resource.production"; // Orange
         name = "Strong";
         description = `+15% ${specialization.subtype} efficiency`;
         break;
       case "clever":
-        icon = "🧠";
-        color = "#5ea8ed"; // Blue
+        icon = Brain;
+        color = "resource.science"; // Blue
         name = "Clever";
         description = `+15% ${specialization.subtype} output`;
         break;
@@ -75,26 +71,35 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
     return subtype.charAt(0).toUpperCase() + subtype.slice(1);
   };
 
+  // Handle selecting a worker
+  const handleWorkerSelect = (workerId) => {
+    setSelectedWorkerId(workerId);
+  };
+
+  // Handle confirming worker selection
+  const handleConfirmSelection = () => {
+    if (selectedWorkerId && onSelectWorker) {
+      onSelectWorker(selectedWorkerId);
+    }
+  };
+
   return (
     <Box p={4}>
       <Flex justify="space-between" align="center" mb={4}>
         <Heading size="md" color="accent.main">
           Available Workers
         </Heading>
-        <Button size="sm" variant="ghost" onClick={onClose}>
-          ✕
-        </Button>
       </Flex>
 
       <Flex align="center" mb={4}>
-        <Users size={18} color="#e1e1e1" />
-        <Text ml={2} color="text.primary">
+        <Icon as={Users} boxSize={5} color="text.primary" mr={2} />
+        <Text color="text.primary">
           Available Workers: {availableWorkerCount}
         </Text>
       </Flex>
 
       {availableWorkerCount === 0 ? (
-        <Box bg="background.panel" p={4} borderRadius="md" textAlign="center">
+        <Box bg="background.ui" p={4} borderRadius="md" textAlign="center">
           <Text color="text.secondary">No available workers.</Text>
           <Text color="text.secondary" fontSize="sm" mt={2}>
             Unassign workers from buildings or wait for population growth.
@@ -106,33 +111,33 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
             Select a worker to assign:
           </Text>
 
-          <SimpleGrid columns={1} spacing={2}>
+          <VStack
+            spacing={2}
+            align="stretch"
+            mb={4}
+            maxH="300px"
+            overflowY="auto"
+          >
             {availableWorkers.map((worker) => {
               const specialization = getSpecializationInfo(worker.id);
+              const isSelected = selectedWorkerId === worker.id;
 
               return (
                 <Box
                   key={worker.id}
-                  bg={
-                    selectedWorkerId === worker.id
-                      ? "background.highlight"
-                      : "background.panel"
-                  }
+                  bg={isSelected ? "background.highlight" : "background.ui"}
                   p={3}
                   borderRadius="md"
                   cursor="pointer"
-                  onClick={() => handleSelectWorker(worker.id)}
+                  onClick={() => handleWorkerSelect(worker.id)}
                   borderWidth="1px"
-                  borderColor={
-                    selectedWorkerId === worker.id
-                      ? "accent.main"
-                      : "transparent"
-                  }
+                  borderColor={isSelected ? "accent.main" : "transparent"}
                   _hover={{ borderColor: "background.highlight" }}
+                  transition="all 0.2s"
                 >
                   <Flex justify="space-between" align="center">
                     <Flex align="center">
-                      <User size={16} color="#e1e1e1" />
+                      <Icon as={User} boxSize={4} color="text.primary" />
                       <Text ml={2} color="text.primary">
                         Worker
                       </Text>
@@ -144,22 +149,24 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
                           )}): ${specialization.description}`}
                           placement="top"
                         >
-                          <Text fontSize="lg" ml={2}>
-                            {specialization.icon}
-                          </Text>
+                          <Box ml={2}>
+                            <Icon
+                              as={specialization.icon}
+                              boxSize={5}
+                              color={specialization.color}
+                            />
+                          </Box>
                         </Tooltip>
                       )}
                     </Flex>
 
                     {specialization && (
                       <Badge
-                        colorScheme={
-                          specialization.type === "diligent"
-                            ? "yellow"
-                            : specialization.type === "strong"
-                            ? "orange"
-                            : "blue"
-                        }
+                        bg={`${specialization.color}30`}
+                        color={specialization.color}
+                        px={2}
+                        py={0.5}
+                        borderRadius="md"
                         ml={2}
                       >
                         {getSubtypeName(specialization.subtype)}
@@ -175,7 +182,7 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
                 </Box>
               );
             })}
-          </SimpleGrid>
+          </VStack>
         </>
       )}
 
@@ -188,9 +195,7 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
 
         <SimpleGrid columns={3} spacing={2}>
           <Flex align="center">
-            <Text fontSize="lg" mr={2}>
-              💼
-            </Text>
+            <Icon as={Briefcase} boxSize={5} color="resource.gold" mr={2} />
             <Box>
               <Text fontSize="sm" color="text.primary">
                 Diligent
@@ -202,9 +207,7 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
           </Flex>
 
           <Flex align="center">
-            <Text fontSize="lg" mr={2}>
-              💪
-            </Text>
+            <Icon as={User} boxSize={5} color="resource.production" mr={2} />
             <Box>
               <Text fontSize="sm" color="text.primary">
                 Strong
@@ -216,9 +219,7 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
           </Flex>
 
           <Flex align="center">
-            <Text fontSize="lg" mr={2}>
-              🧠
-            </Text>
+            <Icon as={Brain} boxSize={5} color="resource.science" mr={2} />
             <Box>
               <Text fontSize="sm" color="text.primary">
                 Clever
@@ -230,6 +231,20 @@ const WorkerPoolPanel = ({ onSelectWorker, onClose }) => {
           </Flex>
         </SimpleGrid>
       </Box>
+
+      {/* Footer buttons */}
+      <Flex justify="flex-end" mt={6} gap={3}>
+        <SharedButton variant="ghost" onClick={onClose}>
+          Cancel
+        </SharedButton>
+        <SharedButton
+          variant="primary"
+          onClick={handleConfirmSelection}
+          isDisabled={!selectedWorkerId}
+        >
+          Assign Worker
+        </SharedButton>
+      </Flex>
     </Box>
   );
 };

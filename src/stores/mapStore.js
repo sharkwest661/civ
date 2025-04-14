@@ -1,5 +1,10 @@
+// src/stores/mapStore.js
 import { create } from "zustand";
 import { generateHexGrid, hexToId } from "../utils/hexUtils";
+import {
+  TERRITORY_TYPES,
+  BUILDING_SLOT_LIMITS,
+} from "../constants/gameConstants";
 
 /**
  * Map Store
@@ -9,6 +14,8 @@ import { generateHexGrid, hexToId } from "../utils/hexUtils";
  * - Territory ownership
  * - Resource distribution
  * - Building placement
+ *
+ * Refactored with improved action patterns and territory management
  */
 export const useMapStore = create((set, get) => ({
   // Map configuration
@@ -20,92 +27,207 @@ export const useMapStore = create((set, get) => ({
   // Currently selected territory
   selectedTerritory: null,
 
-  // Territory management
-  selectTerritory: (hex) => set({ selectedTerritory: hex }),
+  // Recently discovered territories (for animations)
+  recentlyDiscoveredTerritories: [],
 
-  // Territory creation/modification
+  // Territory actions
+
+  /**
+   * Select a territory
+   * @param {Object} hex - The hex object with q,r coordinates and territory data
+   */
+  selectTerritory: (hex) => {
+    if (!hex) {
+      set({ selectedTerritory: null });
+      return;
+    }
+
+    set({ selectedTerritory: hex });
+  },
+
+  /**
+   * Update a territory's type
+   * @param {string} hexId - The territory ID (q,r coordinates)
+   * @param {string} type - The new territory type
+   */
   setTerritoryType: (hexId, type) => {
-    set((state) => ({
-      territories: {
-        ...state.territories,
-        [hexId]: {
-          ...state.territories[hexId],
-          type,
-        },
-      },
-    }));
-  },
+    if (!hexId || !type) return;
 
-  setTerritoryOwner: (hexId, ownerId) => {
-    set((state) => ({
-      territories: {
-        ...state.territories,
-        [hexId]: {
-          ...state.territories[hexId],
-          owner: ownerId,
-          isOwned: true,
-          isExplored: true,
-        },
-      },
-    }));
-  },
+    set((state) => {
+      // Skip if territory doesn't exist or already has this type
+      if (!state.territories[hexId] || state.territories[hexId].type === type) {
+        return state;
+      }
 
-  setTerritoryResource: (hexId, resource) => {
-    set((state) => ({
-      territories: {
-        ...state.territories,
-        [hexId]: {
-          ...state.territories[hexId],
-          resource,
-        },
-      },
-    }));
-  },
-
-  exploreTerritoryId: (hexId) => {
-    set((state) => ({
-      territories: {
-        ...state.territories,
-        [hexId]: {
-          ...state.territories[hexId],
-          isExplored: true,
-          isNewlyDiscovered: true,
-        },
-      },
-    }));
-
-    // Clear the newly discovered flag after a short delay
-    setTimeout(() => {
-      set((state) => ({
+      return {
         territories: {
           ...state.territories,
           [hexId]: {
             ...state.territories[hexId],
-            isNewlyDiscovered: false,
+            type,
           },
         },
-      }));
+      };
+    });
+  },
+
+  /**
+   * Set the owner of a territory
+   * @param {string} hexId - The territory ID
+   * @param {string} ownerId - The ID of the owner (player or AI)
+   */
+  setTerritoryOwner: (hexId, ownerId) => {
+    if (!hexId) return;
+
+    set((state) => {
+      const territory = state.territories[hexId];
+      if (!territory) return state;
+
+      // Skip if already owned by this owner
+      if (territory.owner === ownerId) return state;
+
+      const updatedTerritory = {
+        ...territory,
+        owner: ownerId,
+        isOwned: ownerId !== null,
+        isExplored: true,
+        isNewlyClaimed: ownerId !== null && territory.owner !== ownerId,
+      };
+
+      return {
+        territories: {
+          ...state.territories,
+          [hexId]: updatedTerritory,
+        },
+      };
+    });
+
+    // Clear the newly claimed flag after a delay
+    if (ownerId !== null) {
+      setTimeout(() => {
+        set((state) => {
+          const territory = state.territories[hexId];
+          if (!territory || !territory.isNewlyClaimed) return state;
+
+          return {
+            territories: {
+              ...state.territories,
+              [hexId]: {
+                ...territory,
+                isNewlyClaimed: false,
+              },
+            },
+          };
+        });
+      }, 3000);
+    }
+  },
+
+  /**
+   * Set a resource for a territory
+   * @param {string} hexId - The territory ID
+   * @param {string} resource - The resource type
+   */
+  setTerritoryResource: (hexId, resource) => {
+    if (!hexId) return;
+
+    set((state) => {
+      const territory = state.territories[hexId];
+      if (!territory) return state;
+
+      return {
+        territories: {
+          ...state.territories,
+          [hexId]: {
+            ...territory,
+            resource,
+          },
+        },
+      };
+    });
+  },
+
+  /**
+   * Mark a territory as explored
+   * @param {string} hexId - The territory ID
+   */
+  exploreTerritoryId: (hexId) => {
+    if (!hexId) return;
+
+    set((state) => {
+      const territory = state.territories[hexId];
+      if (!territory || territory.isExplored) return state;
+
+      // Add to recently discovered territories
+      const newDiscoveredTerritories = [
+        ...state.recentlyDiscoveredTerritories,
+        hexId,
+      ];
+
+      return {
+        territories: {
+          ...state.territories,
+          [hexId]: {
+            ...territory,
+            isExplored: true,
+            isNewlyDiscovered: true,
+          },
+        },
+        recentlyDiscoveredTerritories: newDiscoveredTerritories,
+      };
+    });
+
+    // Clear the newly discovered flag after a delay
+    setTimeout(() => {
+      set((state) => {
+        const territory = state.territories[hexId];
+        if (!territory || !territory.isNewlyDiscovered) return state;
+
+        // Remove from recently discovered territories
+        const newDiscoveredTerritories =
+          state.recentlyDiscoveredTerritories.filter((id) => id !== hexId);
+
+        return {
+          territories: {
+            ...state.territories,
+            [hexId]: {
+              ...territory,
+              isNewlyDiscovered: false,
+            },
+          },
+          recentlyDiscoveredTerritories: newDiscoveredTerritories,
+        };
+      });
     }, 3000);
   },
 
-  // Building management
+  /**
+   * Add a building to a territory
+   * @param {string} hexId - The territory ID
+   * @param {Object} building - The building to add
+   */
   addBuilding: (hexId, building) => {
+    if (!hexId || !building) return;
+
     set((state) => {
-      const territory = state.territories[hexId] || {};
+      const territory = state.territories[hexId];
+      if (!territory) return state;
+
+      // Get current buildings or empty array
       const buildings = territory.buildings || [];
 
-      // Get slot limit based on territory type
-      let slotLimit = 1; // Default for regular territories
+      // Calculate slot limit based on territory type
+      let slotLimit = BUILDING_SLOT_LIMITS.DEFAULT;
 
       if (territory.isCapital) {
-        slotLimit = 2; // Capital gets 2 slots
+        slotLimit = BUILDING_SLOT_LIMITS.CAPITAL;
       } else if (territory.resource) {
-        slotLimit = 2; // Resource-rich territories get 2 slots
+        slotLimit = BUILDING_SLOT_LIMITS.RESOURCE;
       }
 
-      // Check if we've reached the slot limit
+      // Skip if we've reached the slot limit
       if (buildings.length >= slotLimit) {
-        return state; // Can't add more buildings
+        return state;
       }
 
       return {
@@ -120,43 +242,151 @@ export const useMapStore = create((set, get) => ({
     });
   },
 
+  /**
+   * Upgrade a building in a territory
+   * @param {string} hexId - The territory ID
+   * @param {number} buildingIndex - The index of the building to upgrade
+   * @param {number} newLevel - The new level for the building
+   */
   upgradeBuilding: (hexId, buildingIndex, newLevel) => {
-    set((state) => {
-      const territory = state.territories[hexId] || {};
-      const buildings = [...(territory.buildings || [])];
+    if (!hexId || buildingIndex === undefined || !newLevel) return;
 
-      if (buildings[buildingIndex]) {
-        buildings[buildingIndex] = {
-          ...buildings[buildingIndex],
-          level: newLevel,
-        };
-      }
+    set((state) => {
+      const territory = state.territories[hexId];
+      if (!territory) return state;
+
+      const buildings = territory.buildings || [];
+
+      // Skip if building doesn't exist
+      if (!buildings[buildingIndex]) return state;
+
+      // Create new buildings array with updated building
+      const updatedBuildings = [...buildings];
+      updatedBuildings[buildingIndex] = {
+        ...updatedBuildings[buildingIndex],
+        level: newLevel,
+      };
 
       return {
         territories: {
           ...state.territories,
           [hexId]: {
             ...territory,
-            buildings,
+            buildings: updatedBuildings,
           },
         },
       };
     });
   },
 
-  // Initialize map with territory types
+  /**
+   * Remove a building from a territory
+   * @param {string} hexId - The territory ID
+   * @param {number} buildingIndex - The index of the building to remove
+   */
+  removeBuilding: (hexId, buildingIndex) => {
+    if (!hexId || buildingIndex === undefined) return;
+
+    set((state) => {
+      const territory = state.territories[hexId];
+      if (!territory) return state;
+
+      const buildings = territory.buildings || [];
+
+      // Skip if building doesn't exist
+      if (!buildings[buildingIndex]) return state;
+
+      // Create new buildings array without the removed building
+      const updatedBuildings = buildings.filter(
+        (_, index) => index !== buildingIndex
+      );
+
+      return {
+        territories: {
+          ...state.territories,
+          [hexId]: {
+            ...territory,
+            buildings: updatedBuildings,
+          },
+        },
+      };
+    });
+  },
+
+  /**
+   * Set a territory under attack
+   * @param {string} hexId - The territory ID
+   * @param {boolean} isUnderAttack - Whether the territory is under attack
+   */
+  setTerritoryUnderAttack: (hexId, isUnderAttack) => {
+    if (!hexId) return;
+
+    set((state) => {
+      const territory = state.territories[hexId];
+      if (!territory) return state;
+
+      return {
+        territories: {
+          ...state.territories,
+          [hexId]: {
+            ...territory,
+            isUnderAttack,
+          },
+        },
+      };
+    });
+  },
+
+  // Query methods (selectors)
+
+  /**
+   * Get all owned territories for a player
+   * @param {string} playerId - The player ID
+   * @returns {Object} Map of owned territories
+   */
+  getOwnedTerritories: (playerId) => {
+    const { territories } = get();
+
+    return Object.entries(territories)
+      .filter(([_, territory]) => territory.owner === playerId)
+      .reduce((result, [id, territory]) => {
+        result[id] = territory;
+        return result;
+      }, {});
+  },
+
+  /**
+   * Get the capital territory for a player
+   * @param {string} playerId - The player ID
+   * @returns {Object|null} The capital territory or null
+   */
+  getCapitalTerritory: (playerId) => {
+    const { territories } = get();
+
+    const capitalId = Object.entries(territories).find(
+      ([_, territory]) => territory.owner === playerId && territory.isCapital
+    )?.[0];
+
+    return capitalId ? { id: capitalId, ...territories[capitalId] } : null;
+  },
+
+  // Initialization
+
+  /**
+   * Initialize the map with territory types and basic resources
+   */
   initializeMap: () => {
     const hexes = generateHexGrid(get().mapRadius);
     const territories = {};
 
     // Territory types with weights
     const territoryTypes = [
-      { type: "plains", weight: 3 }, // Most common
-      { type: "forest", weight: 2 },
-      { type: "hills", weight: 2 },
-      { type: "mountains", weight: 1 },
-      { type: "desert", weight: 1 },
-      { type: "swamp", weight: 1 },
+      { type: TERRITORY_TYPES.PLAINS, weight: 3 }, // Most common
+      { type: TERRITORY_TYPES.FOREST, weight: 2 },
+      { type: TERRITORY_TYPES.HILLS, weight: 2 },
+      { type: TERRITORY_TYPES.MOUNTAINS, weight: 1 },
+      { type: TERRITORY_TYPES.DESERT, weight: 1 },
+      { type: TERRITORY_TYPES.SWAMP, weight: 1 },
     ];
 
     // Flatten weights into an array for random selection
@@ -181,7 +411,7 @@ export const useMapStore = create((set, get) => ({
       // Skip the center hex for capital
       if (hex.q === 0 && hex.r === 0) {
         territories[hexId] = {
-          type: "plains",
+          type: TERRITORY_TYPES.PLAINS,
           isCapital: true,
           isOwned: true,
           owner: "player1",
@@ -189,6 +419,7 @@ export const useMapStore = create((set, get) => ({
           resource: "wheat", // Start with some food
           buildings: [
             {
+              id: "center",
               name: "Town Center",
               type: "center",
               level: 1,
@@ -204,10 +435,12 @@ export const useMapStore = create((set, get) => ({
         Math.abs(hex.r),
         Math.abs(-hex.q - hex.r)
       );
+
+      // First ring is always visible and owned
       if (distance === 1) {
-        // First ring is always visible and owned
         const randomType =
           flattenedTypes[Math.floor(Math.random() * flattenedTypes.length)];
+
         territories[hexId] = {
           type: randomType,
           isOwned: true,
@@ -227,6 +460,7 @@ export const useMapStore = create((set, get) => ({
       else if (distance === 2) {
         const randomType =
           flattenedTypes[Math.floor(Math.random() * flattenedTypes.length)];
+
         territories[hexId] = {
           type: randomType,
           isOwned: false,
@@ -249,19 +483,17 @@ export const useMapStore = create((set, get) => ({
       else {
         const randomType =
           flattenedTypes[Math.floor(Math.random() * flattenedTypes.length)];
+
         territories[hexId] = {
           type: randomType,
           isOwned: false,
           owner: null,
           isExplored: false,
         };
-
-        // Only determine resources when explored
-        // Just stub the structure for now
       }
     });
 
-    set({ territories });
+    set({ territories, recentlyDiscoveredTerritories: [] });
   },
 }));
 
