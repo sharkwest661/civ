@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   calculateHexPoints,
   pointsToSvgString,
@@ -18,7 +18,13 @@ const HexTile = ({
   onClick = () => {},
   onMouseEnter = () => {},
   onMouseLeave = () => {},
+  registerTooltip = () => {},
+  unregisterTooltip = () => {},
 }) => {
+  // State for tooltip
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipTimerRef = useRef(null);
+
   // Calculate the points and center for this hexagon
   const { points, center } = useMemo(() => {
     const hexPoints = calculateHexPoints(q, r, size);
@@ -99,6 +105,42 @@ const HexTile = ({
     };
   };
 
+  // Performance-optimized tooltip handling
+  const handleHexMouseEnter = (hexData) => {
+    // Call the original handler
+    onMouseEnter(hexData);
+
+    // Clear any existing timer
+    if (tooltipTimerRef.current) {
+      clearTimeout(tooltipTimerRef.current);
+    }
+
+    // Set a new timer to show tooltip after 1 second
+    tooltipTimerRef.current = setTimeout(() => {
+      setShowTooltip(true);
+
+      const tooltipId = `tooltip-${q}-${r}`;
+      registerTooltip(tooltipId, { q, r, center, territory });
+    }, 800);
+  };
+
+  const handleHexMouseLeave = (hexData) => {
+    // Call the original handler
+    onMouseLeave(hexData);
+
+    // Clear any existing timer
+    if (tooltipTimerRef.current) {
+      clearTimeout(tooltipTimerRef.current);
+      tooltipTimerRef.current = null;
+    }
+
+    // Hide tooltip
+    setShowTooltip(false);
+
+    const tooltipId = `tooltip-${q}-${r}`;
+    unregisterTooltip(tooltipId);
+  };
+
   const { strokeWidth, stroke } = getStrokeStyle();
   const fillColor = getFillColor();
 
@@ -113,8 +155,8 @@ const HexTile = ({
   return (
     <g
       onClick={() => onClick({ q, r, territory })}
-      onMouseEnter={() => onMouseEnter({ q, r, territory })}
-      onMouseLeave={() => onMouseLeave({ q, r, territory })}
+      onMouseEnter={() => handleHexMouseEnter({ q, r, territory })}
+      onMouseLeave={() => handleHexMouseLeave({ q, r, territory })}
       style={{ cursor: "pointer" }}
     >
       <polygon
@@ -160,8 +202,6 @@ const HexTile = ({
           </div>
         </foreignObject>
       )}
-
-      {/* Could add additional indicators for buildings, military units, etc. here */}
     </g>
   );
 };

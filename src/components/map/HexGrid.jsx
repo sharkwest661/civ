@@ -36,6 +36,9 @@ const HexGrid = ({
   // State for tracking the hovered hex
   const [hoveredHex, setHoveredHex] = useState(null);
 
+  // State for tracking active tooltips
+  const [activeTooltips, setActiveTooltips] = useState({});
+
   // State for pan and zoom functionality
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -43,7 +46,7 @@ const HexGrid = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const svgRef = useRef(null);
 
-  // Handle mouse down for panning - memoized with useCallback
+  // Handle mouse down for panning
   const handleMouseDown = useCallback(
     (e) => {
       if (!panEnabled) return;
@@ -57,7 +60,7 @@ const HexGrid = ({
     [panEnabled, panOffset]
   );
 
-  // Handle mouse move for panning - memoized with useCallback
+  // Handle mouse move for panning
   const handleMouseMove = useCallback(
     (e) => {
       if (!isDragging || !panEnabled) return;
@@ -70,12 +73,12 @@ const HexGrid = ({
     [isDragging, panEnabled, dragStart]
   );
 
-  // Handle mouse up to end panning - memoized with useCallback
+  // Handle mouse up to end panning
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
-  // Handle wheel event for zooming - memoized with useCallback
+  // Handle wheel event for zooming
   const handleWheel = useCallback(
     (e) => {
       if (!zoomEnabled) return;
@@ -91,6 +94,23 @@ const HexGrid = ({
     [zoomEnabled, zoomLevel]
   );
 
+  // Register a tooltip
+  const registerTooltip = useCallback((tooltipId, tooltipData) => {
+    setActiveTooltips((prev) => ({
+      ...prev,
+      [tooltipId]: tooltipData,
+    }));
+  }, []);
+
+  // Unregister a tooltip
+  const unregisterTooltip = useCallback((tooltipId) => {
+    setActiveTooltips((prev) => {
+      const newTooltips = { ...prev };
+      delete newTooltips[tooltipId];
+      return newTooltips;
+    });
+  }, []);
+
   // Add event listeners for pan/zoom
   useEffect(() => {
     const svg = svgRef.current;
@@ -105,7 +125,7 @@ const HexGrid = ({
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [handleWheel, handleMouseUp, handleMouseMove]); // Using memoized handlers in the dependency array
+  }, [handleWheel, handleMouseUp, handleMouseMove]);
 
   // Determine the SVG viewBox
   const viewBox = useMemo(() => {
@@ -117,6 +137,69 @@ const HexGrid = ({
       height + paddingY * 2
     }`;
   }, [minX, minY, width, height]);
+
+  // Render tooltips
+  const renderTooltips = () => {
+    return Object.values(activeTooltips).map((tooltipData) => {
+      const { q, r, center, territory } = tooltipData;
+
+      if (!territory.isExplored) return null;
+
+      const tooltipWidth = 200;
+      const tooltipHeight = territory.resource ? 120 : 90;
+      const tooltipX = center.x - tooltipWidth / 2;
+      const tooltipY = center.y - tooltipHeight - 15; // Position above the hex
+
+      return (
+        <foreignObject
+          key={`tooltip-${q}-${r}`}
+          x={tooltipX}
+          y={tooltipY}
+          width={tooltipWidth}
+          height={tooltipHeight}
+          style={{ pointerEvents: "none" }}
+        >
+          <div
+            style={{
+              backgroundColor: "#131e2d",
+              border: "1px solid #2a3c53",
+              borderRadius: "4px",
+              padding: "8px",
+              color: "#e1e1e1",
+              fontSize: "15px",
+              pointerEvents: "none",
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
+              zIndex: 100, // Ensure the tooltip has a high z-index
+            }}
+          >
+            <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
+              Coordinates: ({q}, {r})
+            </div>
+            {territory.isCapital && (
+              <div style={{ color: "#e6c570", marginBottom: "4px" }}>
+                Capital
+              </div>
+            )}
+            {territory.type && territory.type !== "unexplored" && (
+              <div style={{ marginBottom: "4px" }}>
+                Type:{" "}
+                {territory.type.charAt(0).toUpperCase() +
+                  territory.type.slice(1)}
+              </div>
+            )}
+            {territory.resource && (
+              <div style={{ marginBottom: "4px" }}>
+                Resource: {territory.resource}
+              </div>
+            )}
+            {territory.isOwned && (
+              <div style={{ color: "#7dce82" }}>Owned Territory</div>
+            )}
+          </div>
+        </foreignObject>
+      );
+    });
+  };
 
   return (
     <div
@@ -159,13 +242,18 @@ const HexGrid = ({
                 onClick={onHexClick}
                 onMouseEnter={() => setHoveredHex(hex)}
                 onMouseLeave={() => setHoveredHex(null)}
+                registerTooltip={registerTooltip}
+                unregisterTooltip={unregisterTooltip}
               />
             );
           })}
         </g>
+
+        {/* Render tooltips on top level */}
+        <g className="tooltips-layer">{renderTooltips()}</g>
       </svg>
     </div>
   );
 };
 
-export default React.memo(HexGrid); // Use memo to prevent unnecessary re-renders
+export default React.memo(HexGrid);
