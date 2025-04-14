@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import HexGrid from "./HexGrid";
 import { hexToId } from "../../utils/hexUtils";
 
@@ -26,13 +26,14 @@ const MapView = ({
   };
 
   // Function to determine if a territory should be visible to the player
-  const getVisibleTerritories = () => {
-    const visibleTerritories = {};
+  // Using useMemo to prevent recreation on every render
+  const visibleTerritories = useMemo(() => {
+    const result = {};
 
     Object.entries(territories).forEach(([id, territory]) => {
       // Always show owned territories
       if (territory.owner === currentPlayer.id) {
-        visibleTerritories[id] = {
+        result[id] = {
           ...territory,
           isOwned: true,
           isCapital: territory.isCapital,
@@ -40,14 +41,14 @@ const MapView = ({
       }
       // Show explored territories
       else if (territory.isExplored && territory.owner === null) {
-        visibleTerritories[id] = {
+        result[id] = {
           ...territory,
           isExplored: true,
         };
       }
       // Show other player territories if discovered
       else if (territory.isExplored && territory.owner !== null) {
-        visibleTerritories[id] = {
+        result[id] = {
           ...territory,
           isExplored: true,
           isOwned: false,
@@ -55,21 +56,21 @@ const MapView = ({
       }
       // For territories not yet explored, just show as unexplored
       else {
-        visibleTerritories[id] = {
+        result[id] = {
           type: "unexplored",
         };
       }
     });
 
-    return visibleTerritories;
-  };
+    return result;
+  }, [territories, currentPlayer.id]); // Only recalculate when these dependencies change
 
   return (
     <div className="map-view" style={{ width: "100%", height: "100%" }}>
       <HexGrid
         radius={7} // Radius of the map (in hexes)
         hexSize={40} // Size of each hex
-        territories={getVisibleTerritories()}
+        territories={visibleTerritories}
         onHexClick={handleHexClick}
         selectedHex={selectedHex}
         panEnabled={true}

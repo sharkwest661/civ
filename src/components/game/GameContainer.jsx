@@ -1,7 +1,9 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import MapView from "../map/MapView";
 import ResourcePanel from "../resources/ResourcePanel";
 import TurnControls from "./TurnControls";
+import BuildingPanel from "../buildings/BuildingPanel";
+import TechnologyTree from "../technology/TechnologyTree";
 import { useGameStore } from "../../stores/gameStore";
 import { useMapStore } from "../../stores/mapStore";
 import { useResourcesStore } from "../../stores/resourcesStore";
@@ -10,47 +12,273 @@ import { useResourcesStore } from "../../stores/resourcesStore";
  * GameContainer is the main component that brings together all game elements
  */
 const GameContainer = () => {
-  // Get state from various stores
-  const { currentTurn, currentPhase, currentPlayer, advanceTurn, setPhase } =
-    useGameStore((state) => ({
-      currentTurn: state.currentTurn,
-      currentPhase: state.currentPhase,
-      currentPlayer: state.currentPlayer,
-      advanceTurn: state.advanceTurn,
-      setPhase: state.setPhase,
-    }));
+  // Component state
+  const [activeSidePanel, setActiveSidePanel] = useState(null); // null, "building", "tech", "military", "diplomacy"
 
-  const { territories, selectTerritory, selectedTerritory } = useMapStore(
-    (state) => ({
-      territories: state.territories,
-      selectTerritory: state.selectTerritory,
-      selectedTerritory: state.selectedTerritory,
-    })
+  // IMPORTANT: Use individual selectors for each piece of state to prevent unnecessary re-renders
+  // Game store selectors
+  const currentTurn = useGameStore((state) => state.currentTurn);
+  const currentPhase = useGameStore((state) => state.currentPhase);
+  const currentPlayer = useGameStore((state) => state.currentPlayer);
+  const advanceTurn = useGameStore((state) => state.advanceTurn);
+  const setPhase = useGameStore((state) => state.setPhase);
+
+  // Map store selectors
+  const territories = useMapStore((state) => state.territories);
+  const selectedTerritory = useMapStore((state) => state.selectedTerritory);
+  const selectTerritory = useMapStore((state) => state.selectTerritory);
+
+  // Resources store selectors
+  const resources = useResourcesStore((state) => state.resources);
+  const updateAllResources = useResourcesStore(
+    (state) => state.updateAllResources
   );
 
-  const { resources } = useResourcesStore((state) => ({
-    resources: state.resources,
-  }));
+  // Handle territory selection - memoize with useCallback
+  const handleTerritorySelect = useCallback(
+    (hex) => {
+      selectTerritory(hex);
+    },
+    [selectTerritory]
+  );
 
-  // Handle territory selection
-  const handleTerritorySelect = (hex) => {
-    selectTerritory(hex);
-  };
+  // Handle end turn - memoize with useCallback
+  const handleEndTurn = useCallback(() => {
+    // Update all resources based on production
+    updateAllResources();
 
-  // Handle end turn
-  const handleEndTurn = () => {
+    // Advance to the next turn
     advanceTurn();
-  };
+  }, [updateAllResources, advanceTurn]);
 
-  // Handle phase change
-  const handlePhaseChange = (phase) => {
-    setPhase(phase);
-  };
+  // Handle phase change - memoize with useCallback
+  const handlePhaseChange = useCallback(
+    (phase) => {
+      setPhase(phase);
+
+      // Set the appropriate side panel based on the phase
+      switch (phase) {
+        case "Building":
+          setActiveSidePanel("building");
+          break;
+        case "Research":
+          setActiveSidePanel("tech");
+          break;
+        case "Military":
+          setActiveSidePanel("military");
+          break;
+        case "Diplomacy":
+          setActiveSidePanel("diplomacy");
+          break;
+        default:
+          setActiveSidePanel(null);
+      }
+    },
+    [setPhase]
+  );
+
+  // Toggle side panel - memoize with useCallback
+  const toggleSidePanel = useCallback((panel) => {
+    setActiveSidePanel((prev) => (prev === panel ? null : panel));
+  }, []);
 
   // Set page title
   useEffect(() => {
     document.title = "Empire's Legacy";
   }, []);
+
+  // Render the appropriate side panel
+  const renderSidePanel = () => {
+    switch (activeSidePanel) {
+      case "building":
+        return (
+          <BuildingPanel
+            selectedTerritory={selectedTerritory}
+            onClose={() => setActiveSidePanel(null)}
+          />
+        );
+      case "tech":
+        return <TechnologyTree onClose={() => setActiveSidePanel(null)} />;
+      case "military":
+        return (
+          <div className="panel-placeholder" style={{ padding: "20px" }}>
+            <h3 style={{ color: "#e6c570", marginBottom: "15px" }}>
+              Military Panel
+            </h3>
+            <p style={{ color: "#8a9bbd" }}>
+              Military panel would be implemented here.
+            </p>
+            <button
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#8a9bbd",
+                cursor: "pointer",
+                position: "absolute",
+                top: "15px",
+                right: "15px",
+                fontSize: "20px",
+              }}
+              onClick={() => setActiveSidePanel(null)}
+            >
+              ×
+            </button>
+          </div>
+        );
+      case "diplomacy":
+        return (
+          <div className="panel-placeholder" style={{ padding: "20px" }}>
+            <h3 style={{ color: "#e6c570", marginBottom: "15px" }}>
+              Diplomacy Panel
+            </h3>
+            <p style={{ color: "#8a9bbd" }}>
+              Diplomacy panel would be implemented here.
+            </p>
+            <button
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#8a9bbd",
+                cursor: "pointer",
+                position: "absolute",
+                top: "15px",
+                right: "15px",
+                fontSize: "20px",
+              }}
+              onClick={() => setActiveSidePanel(null)}
+            >
+              ×
+            </button>
+          </div>
+        );
+      default:
+        return (
+          <div
+            className="side-panel-default"
+            style={{
+              padding: "20px",
+            }}
+          >
+            <h3
+              style={{
+                color: "#e6c570",
+                margin: "0 0 20px 0",
+                fontSize: "20px",
+              }}
+            >
+              Actions
+            </h3>
+
+            <div
+              className="action-buttons"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              <button
+                style={{
+                  background: "#e6c570",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "10px 15px",
+                  color: "#131e2d",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+                onClick={() => toggleSidePanel("building")}
+              >
+                Build Structure
+              </button>
+
+              <button
+                style={{
+                  background: "#2a3c53",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "10px 15px",
+                  color: "#e1e1e1",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+                onClick={() => toggleSidePanel("tech")}
+              >
+                Research Technology
+              </button>
+
+              <button
+                style={{
+                  background: "#2a3c53",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "10px 15px",
+                  color: "#e1e1e1",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+                onClick={() => toggleSidePanel("military")}
+              >
+                Military Operations
+              </button>
+
+              <button
+                style={{
+                  background: "#2a3c53",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "10px 15px",
+                  color: "#e1e1e1",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+                onClick={() => toggleSidePanel("diplomacy")}
+              >
+                Diplomacy
+              </button>
+            </div>
+
+            {selectedTerritory && (
+              <div
+                style={{
+                  marginTop: "30px",
+                  padding: "15px",
+                  background: "#1a2634",
+                  borderRadius: "4px",
+                  border: "1px solid #2a3c53",
+                }}
+              >
+                <h4 style={{ color: "#e1e1e1", margin: "0 0 10px 0" }}>
+                  Selected Territory
+                </h4>
+                <p style={{ color: "#8a9bbd", margin: "5px 0" }}>
+                  Coordinates: ({selectedTerritory.q}, {selectedTerritory.r})
+                </p>
+                {selectedTerritory.territory && (
+                  <>
+                    {selectedTerritory.territory.type && (
+                      <p style={{ color: "#8a9bbd", margin: "5px 0" }}>
+                        Type:{" "}
+                        {selectedTerritory.territory.type
+                          .charAt(0)
+                          .toUpperCase() +
+                          selectedTerritory.territory.type.slice(1)}
+                      </p>
+                    )}
+                    {selectedTerritory.territory.resource && (
+                      <p style={{ color: "#8a9bbd", margin: "5px 0" }}>
+                        Resource: {selectedTerritory.territory.resource}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+    }
+  };
 
   return (
     <div
@@ -126,75 +354,15 @@ const GameContainer = () => {
         <div
           className="side-panel"
           style={{
-            width: "300px",
+            width: "500px",
             background: "#131e2d", // Panel color from design doc
             borderLeft: "1px solid #2a3c53",
-            padding: "20px",
+            padding: "0",
             overflowY: "auto",
+            position: "relative",
           }}
         >
-          <h2
-            style={{
-              color: "#e6c570", // Gold color from design doc
-              margin: "0 0 20px 0",
-              fontSize: "20px",
-            }}
-          >
-            Actions
-          </h2>
-
-          {/* Action buttons would go here */}
-          <div
-            className="action-buttons"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-            }}
-          >
-            <button
-              style={{
-                background: "#e6c570", // Gold color from design doc
-                border: "none",
-                borderRadius: "4px",
-                padding: "10px 15px",
-                color: "#131e2d",
-                fontSize: "14px",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Build Structure
-            </button>
-
-            <button
-              style={{
-                background: "#2a3c53", // Secondary button color from design doc
-                border: "none",
-                borderRadius: "4px",
-                padding: "10px 15px",
-                color: "#e1e1e1",
-                fontSize: "14px",
-                cursor: "pointer",
-              }}
-            >
-              Assign Workers
-            </button>
-
-            <button
-              style={{
-                background: "#2a3c53", // Secondary button color from design doc
-                border: "none",
-                borderRadius: "4px",
-                padding: "10px 15px",
-                color: "#e1e1e1",
-                fontSize: "14px",
-                cursor: "pointer",
-              }}
-            >
-              Research Technology
-            </button>
-          </div>
+          {renderSidePanel()}
         </div>
       </div>
 
@@ -246,4 +414,4 @@ const GameContainer = () => {
   );
 };
 
-export default GameContainer;
+export default React.memo(GameContainer); // Memoize to prevent unnecessary re-renders

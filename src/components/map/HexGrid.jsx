@@ -1,4 +1,10 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import HexTile from "./HexTile";
 import {
   generateHexGrid,
@@ -37,44 +43,53 @@ const HexGrid = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const svgRef = useRef(null);
 
-  // Handle mouse down for panning
-  const handleMouseDown = (e) => {
-    if (!panEnabled) return;
+  // Handle mouse down for panning - memoized with useCallback
+  const handleMouseDown = useCallback(
+    (e) => {
+      if (!panEnabled) return;
 
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - panOffset.x,
-      y: e.clientY - panOffset.y,
-    });
-  };
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - panOffset.x,
+        y: e.clientY - panOffset.y,
+      });
+    },
+    [panEnabled, panOffset]
+  );
 
-  // Handle mouse move for panning
-  const handleMouseMove = (e) => {
-    if (!isDragging || !panEnabled) return;
+  // Handle mouse move for panning - memoized with useCallback
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (!isDragging || !panEnabled) return;
 
-    setPanOffset({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    });
-  };
+      setPanOffset({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    },
+    [isDragging, panEnabled, dragStart]
+  );
 
-  // Handle mouse up to end panning
-  const handleMouseUp = () => {
+  // Handle mouse up to end panning - memoized with useCallback
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
 
-  // Handle wheel event for zooming
-  const handleWheel = (e) => {
-    if (!zoomEnabled) return;
+  // Handle wheel event for zooming - memoized with useCallback
+  const handleWheel = useCallback(
+    (e) => {
+      if (!zoomEnabled) return;
 
-    e.preventDefault();
+      e.preventDefault();
 
-    // Calculate new zoom level (min: 0.5, max: 2)
-    const delta = e.deltaY < 0 ? 0.1 : -0.1;
-    const newZoomLevel = Math.max(0.5, Math.min(2, zoomLevel + delta));
+      // Calculate new zoom level (min: 0.5, max: 2)
+      const delta = e.deltaY < 0 ? 0.1 : -0.1;
+      const newZoomLevel = Math.max(0.5, Math.min(2, zoomLevel + delta));
 
-    setZoomLevel(newZoomLevel);
-  };
+      setZoomLevel(newZoomLevel);
+    },
+    [zoomEnabled, zoomLevel]
+  );
 
   // Add event listeners for pan/zoom
   useEffect(() => {
@@ -90,7 +105,7 @@ const HexGrid = ({
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [isDragging, dragStart, panOffset, zoomLevel]);
+  }, [handleWheel, handleMouseUp, handleMouseMove]); // Using memoized handlers in the dependency array
 
   // Determine the SVG viewBox
   const viewBox = useMemo(() => {
@@ -153,4 +168,4 @@ const HexGrid = ({
   );
 };
 
-export default HexGrid;
+export default React.memo(HexGrid); // Use memo to prevent unnecessary re-renders

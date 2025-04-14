@@ -3,7 +3,7 @@ import React from "react";
 /**
  * ResourcePanel displays the current resources and their production rates
  */
-const ResourcePanel = ({ resources = {} }) => {
+const ResourcePanel = React.memo(({ resources = {} }) => {
   // Resource colors from design document
   const resourceColors = {
     food: "#7dce82", // Green
@@ -82,6 +82,9 @@ const ResourcePanel = ({ resources = {} }) => {
       })}
     </div>
   );
-};
+});
+
+// Add display name for debugging
+ResourcePanel.displayName = "ResourcePanel";
 
 export default ResourcePanel;
