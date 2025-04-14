@@ -1,10 +1,11 @@
+// src/components/buildings/BuildingTooltip.jsx
 import React from "react";
 import { Box, Text, Divider, Flex, VStack } from "@chakra-ui/react";
+import OptimizedTooltip from "../ui/OptimizedTooltip";
 
 /**
  * BuildingTooltipContent - Displays detailed information about a building
- *
- * @param {Object} building - The building data
+ * Updated to use the optimized tooltip implementation
  */
 const BuildingTooltipContent = ({ building }) => {
   // Early return if no building data
@@ -113,4 +114,21 @@ const BuildingTooltipContent = ({ building }) => {
   );
 };
 
-export default React.memo(BuildingTooltipContent);
+/**
+ * BuildingTooltip - Wrapper component that uses the OptimizedTooltip
+ */
+const BuildingTooltip = ({ children, building }) => {
+  if (!building) return children;
+
+  return (
+    <OptimizedTooltip
+      label={<BuildingTooltipContent building={building} />}
+      delay={400}
+      placement="top"
+    >
+      {children}
+    </OptimizedTooltip>
+  );
+};
+
+export default React.memo(BuildingTooltip);
