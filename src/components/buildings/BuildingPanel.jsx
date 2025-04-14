@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useMapStore } from "../../stores/mapStore";
 import { useResourcesStore } from "../../stores/resourcesStore";
+import { Text } from "@chakra-ui/react";
 
 /**
  * BuildingPanel component for managing building construction and upgrades
@@ -122,6 +123,12 @@ const BuildingPanel = React.memo(({ selectedTerritory, onClose }) => {
 
     // Deduct the resources
     updateResource("production", -upgradeCost);
+  };
+
+  const getSlotLimit = (territory) => {
+    if (territory.isCapital) return 2;
+    if (territory.resource) return 2;
+    return 1;
   };
 
   // Render the list of existing buildings in the territory
@@ -291,6 +298,12 @@ const BuildingPanel = React.memo(({ selectedTerritory, onClose }) => {
         {territory.resource && (
           <p style={{ color: "#8a9bbd" }}>Resource: {territory.resource}</p>
         )}
+
+        {/* Add building slot limit info here */}
+        <Text fontSize="sm" color="text.secondary" mb={2}>
+          Building Slots: {territory.buildings?.length || 0}/
+          {getSlotLimit(territory)}
+        </Text>
       </div>
 
       {/* Existing buildings section */}

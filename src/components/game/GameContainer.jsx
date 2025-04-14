@@ -4,16 +4,18 @@ import ResourcePanel from "../resources/ResourcePanel";
 import TurnControls from "./TurnControls";
 import BuildingPanel from "../buildings/BuildingPanel";
 import TechnologyTree from "../technology/TechnologyTree";
+import WorkerAssignmentPanel from "../workers/WorkerAssignmentPanel";
 import { useGameStore } from "../../stores/gameStore";
 import { useMapStore } from "../../stores/mapStore";
 import { useResourcesStore } from "../../stores/resourcesStore";
+import { useWorkersStore } from "../../stores/workersStore";
 
 /**
  * GameContainer is the main component that brings together all game elements
  */
 const GameContainer = () => {
   // Component state
-  const [activeSidePanel, setActiveSidePanel] = useState(null); // null, "building", "tech", "military", "diplomacy"
+  const [activeSidePanel, setActiveSidePanel] = useState(null); // null, "building", "tech", "military", "diplomacy", "workers"
 
   // IMPORTANT: Use individual selectors for each piece of state to prevent unnecessary re-renders
   // Game store selectors
@@ -33,6 +35,17 @@ const GameContainer = () => {
   const updateAllResources = useResourcesStore(
     (state) => state.updateAllResources
   );
+  const setResourceProduction = useResourcesStore(
+    (state) => state.setResourceProduction
+  );
+
+  // Workers store selectors
+  const clearRecentlyReassigned = useWorkersStore(
+    (state) => state.clearRecentlyReassigned
+  );
+  const getAllBuildingProduction = useWorkersStore(
+    (state) => state.getAllBuildingProduction
+  );
 
   // Handle territory selection - memoize with useCallback
   const handleTerritorySelect = useCallback(
@@ -44,12 +57,30 @@ const GameContainer = () => {
 
   // Handle end turn - memoize with useCallback
   const handleEndTurn = useCallback(() => {
+    // Calculate production from workers
+    const workerProduction = getAllBuildingProduction(territories);
+
+    // Update resource production rates
+    Object.entries(workerProduction).forEach(([resourceType, amount]) => {
+      setResourceProduction(resourceType, amount);
+    });
+
     // Update all resources based on production
     updateAllResources();
 
+    // Clear recently reassigned workers penalty
+    clearRecentlyReassigned();
+
     // Advance to the next turn
     advanceTurn();
-  }, [updateAllResources, advanceTurn]);
+  }, [
+    updateAllResources,
+    advanceTurn,
+    clearRecentlyReassigned,
+    getAllBuildingProduction,
+    territories,
+    setResourceProduction,
+  ]);
 
   // Handle phase change - memoize with useCallback
   const handlePhaseChange = useCallback(
@@ -58,6 +89,9 @@ const GameContainer = () => {
 
       // Set the appropriate side panel based on the phase
       switch (phase) {
+        case "Assignment":
+          setActiveSidePanel("workers");
+          break;
         case "Building":
           setActiveSidePanel("building");
           break;
@@ -90,6 +124,11 @@ const GameContainer = () => {
   // Render the appropriate side panel
   const renderSidePanel = () => {
     switch (activeSidePanel) {
+      case "workers":
+        return (
+          <WorkerAssignmentPanel onClose={() => setActiveSidePanel(null)} />
+        );
+
       case "building":
         return (
           <BuildingPanel
@@ -97,8 +136,10 @@ const GameContainer = () => {
             onClose={() => setActiveSidePanel(null)}
           />
         );
+
       case "tech":
         return <TechnologyTree onClose={() => setActiveSidePanel(null)} />;
+
       case "military":
         return (
           <div className="panel-placeholder" style={{ padding: "20px" }}>
@@ -125,6 +166,7 @@ const GameContainer = () => {
             </button>
           </div>
         );
+
       case "diplomacy":
         return (
           <div className="panel-placeholder" style={{ padding: "20px" }}>
@@ -151,6 +193,7 @@ const GameContainer = () => {
             </button>
           </div>
         );
+
       default:
         return (
           <div
@@ -186,6 +229,21 @@ const GameContainer = () => {
                   color: "#131e2d",
                   fontSize: "14px",
                   fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+                onClick={() => toggleSidePanel("workers")}
+              >
+                Assign Workers
+              </button>
+
+              <button
+                style={{
+                  background: "#2a3c53",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "10px 15px",
+                  color: "#e1e1e1",
+                  fontSize: "14px",
                   cursor: "pointer",
                 }}
                 onClick={() => toggleSidePanel("building")}
@@ -354,7 +412,7 @@ const GameContainer = () => {
         <div
           className="side-panel"
           style={{
-            width: "500px",
+            width: "550px",
             background: "#131e2d", // Panel color from design doc
             borderLeft: "1px solid #2a3c53",
             padding: "0",
