@@ -16,6 +16,7 @@ import { useResourcesStore } from "./stores/resourcesStore";
 import { useTechnologyStore } from "./stores/technologyStore";
 import { useWorkersStore } from "./stores/workersStore";
 import { theme } from "./theme";
+import { SkipToMainContent } from "./components/accessibility/AccessibilityComponents";
 
 function App() {
   // State for tracking initialization
@@ -110,6 +111,8 @@ function App() {
           h="100vh"
           bg="background.main"
           color="text.primary"
+          role="alert"
+          aria-live="assertive"
         >
           <Heading size="xl" color="status.danger" mb={6} fontFamily="heading">
             Initialization Error
@@ -136,6 +139,8 @@ function App() {
         h="100vh"
         bg="background.main"
         color="text.primary"
+        role="status"
+        aria-live="polite"
       >
         <Heading size="xl" color="accent.main" mb={6} fontFamily="heading">
           Empire's Legacy
@@ -161,8 +166,23 @@ function App() {
   return (
     <ChakraProvider theme={theme}>
       <ErrorBoundary onReset={handleReset}>
+        {/* Skip to main content link */}
+        <SkipToMainContent />
+
         <Box className="app" h="100vh" w="100vw">
-          {gameStarted ? <GameContainer /> : renderInitialScreen()}
+          {gameStarted ? (
+            <Box
+              as="main"
+              id="main-content"
+              h="100%"
+              w="100%"
+              aria-label="Empire's Legacy Game"
+            >
+              <GameContainer />
+            </Box>
+          ) : (
+            renderInitialScreen()
+          )}
         </Box>
       </ErrorBoundary>
     </ChakraProvider>

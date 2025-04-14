@@ -5,11 +5,15 @@ import {
   pointsToSvgString,
   axialToPixel,
 } from "../../utils/hexUtils";
-import { TERRITORY_COLORS, ANIMATION } from "../../constants/gameConstants";
+import {
+  getTerritoryFillColor,
+  getTerritoryStrokeStyle,
+} from "../../utils/gameUtils";
+import { ariaLabels } from "../../utils/accessibilityUtils";
 
 /**
  * HexTile component represents a single hexagonal territory on the game map
- * Fixed to ensure proper rendering
+ * Enhanced with accessibility features and proper selection animation
  */
 const HexTile = React.memo(
   ({
@@ -39,67 +43,12 @@ const HexTile = React.memo(
       };
     }, [q, r, size]);
 
-    // Determine fill color based on territory type and state
-    const getFillColor = () => {
-      // Simply return a default color for debugging
-      const defaultColor = "#31394a"; // Slate Gray
+    // Get fill color and stroke style using utility functions
+    const fillColor = getTerritoryFillColor(territory, selected, hovered);
+    const { strokeWidth, stroke } = getTerritoryStrokeStyle(territory);
 
-      // Default to unexplored if no territory info
-      if (!territory.type) {
-        return TERRITORY_COLORS.UNEXPLORED;
-      }
-
-      // Determine base color from territory type
-      let baseColor;
-      if (territory.isCapital) {
-        baseColor = TERRITORY_COLORS.CAPITAL;
-      } else if (territory.isOwned) {
-        baseColor = TERRITORY_COLORS.OWNED;
-      } else if (territory.isExplored) {
-        baseColor = TERRITORY_COLORS.EXPLORED;
-      } else if (territory.hasStrategicResource) {
-        baseColor = TERRITORY_COLORS.STRATEGIC;
-      } else if (territory.hasLuxuryResource) {
-        baseColor = TERRITORY_COLORS.LUXURY;
-      } else if (territory.hasDanger) {
-        baseColor = TERRITORY_COLORS.DANGER;
-      } else {
-        baseColor = TERRITORY_COLORS.UNEXPLORED;
-      }
-
-      // Lighten color by 15% if hovered or selected
-      if (selected || hovered) {
-        // Convert hex to RGB
-        const hex = baseColor.replace("#", "");
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-
-        // Lighten by 15%
-        const lightenFactor = 0.15;
-        const newR = Math.min(255, Math.round(r + (255 - r) * lightenFactor));
-        const newG = Math.min(255, Math.round(g + (255 - g) * lightenFactor));
-        const newB = Math.min(255, Math.round(b + (255 - b) * lightenFactor));
-
-        // Convert back to hex
-        return `#${newR.toString(16).padStart(2, "0")}${newG
-          .toString(16)
-          .padStart(2, "0")}${newB.toString(16).padStart(2, "0")}`;
-      }
-
-      return baseColor;
-    };
-
-    // Determine stroke color and width based on territory state
-    const getStrokeStyle = () => {
-      const baseStrokeWidth = territory.isUnderAttack ? 3 : 2;
-      const baseStrokeColor = territory.isUnderAttack ? "#ff5555" : "#454545";
-
-      return {
-        strokeWidth: baseStrokeWidth,
-        stroke: baseStrokeColor,
-      };
-    };
+    // Generate accessible name for territory
+    const ariaLabel = ariaLabels.territory(territory, q, r);
 
     // Performance-optimized tooltip handling
     const handleHexMouseEnter = () => {
@@ -142,23 +91,63 @@ const HexTile = React.memo(
       onClick({ q, r, territory });
     };
 
-    const { strokeWidth, stroke } = getStrokeStyle();
-    const fillColor = getFillColor();
+    // Handle keyboard events for accessibility
+    const handleKeyDown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick({ q, r, territory });
+      }
+    };
 
     return (
       <g
+        // Accessible attributes
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        aria-selected={selected}
+        aria-pressed={selected}
+        data-q={q}
+        data-r={r}
+        // Event handlers
         onClick={handleHexClick}
         onMouseEnter={handleHexMouseEnter}
         onMouseLeave={handleHexMouseLeave}
-        style={{ cursor: "pointer" }}
+        onKeyDown={handleKeyDown}
+        onFocus={handleHexMouseEnter}
+        onBlur={handleHexMouseLeave}
+        // Styling
+        style={{
+          cursor: "pointer",
+          outline: "none", // We'll handle focus visually with other properties
+        }}
         data-testid={`hex-${q}-${r}`}
       >
+        {/* Base hex tile */}
         <polygon
           points={points}
           fill={fillColor}
-          strokeWidth={strokeWidth}
-          stroke={stroke}
+          strokeWidth={selected || hovered ? strokeWidth + 1 : strokeWidth}
+          stroke={selected ? "#e6c570" : stroke} // Use accent color for selected territories
+          style={{
+            transition: "stroke-width 0.2s, stroke 0.2s",
+          }}
         />
+
+        {/* Selection indicator - outer glow effect */}
+        {selected && (
+          <polygon
+            points={points}
+            fill="none"
+            stroke="#e6c570"
+            strokeWidth={3}
+            style={{
+              opacity: 0.6,
+              filter: "drop-shadow(0 0 3px #e6c570)",
+              animation: "pulse 2s infinite",
+            }}
+          />
+        )}
 
         {/* Render resource icon if the territory has resources */}
         {territory.resource && territory.isExplored && (
@@ -175,7 +164,9 @@ const HexTile = React.memo(
                 justifyContent: "center",
                 width: "100%",
                 height: "100%",
+                pointerEvents: "none", // Prevents capturing mouse events from the hex
               }}
+              aria-hidden="true" // Hide from screen readers since it's decorative
             >
               <span
                 style={{

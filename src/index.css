@@ -101,6 +101,19 @@ h4 {
   }
 }
 
+/* Animation for focusing on selected territories */
+@keyframes focus-pulse {
+  0% {
+    stroke-opacity: 0.4;
+  }
+  50% {
+    stroke-opacity: 1;
+  }
+  100% {
+    stroke-opacity: 0.4;
+  }
+}
+
 /* Hide scrollbars but keep functionality */
 .scrollbar-hidden {
   -ms-overflow-style: none; /* IE and Edge */
@@ -109,6 +122,19 @@ h4 {
 
 .scrollbar-hidden::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
+}
+
+/* Screen-reader only utility class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 /* Root container */

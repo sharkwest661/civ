@@ -1,5 +1,5 @@
 // src/components/buildings/BuildingPanel.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Heading,
@@ -17,16 +17,17 @@ import { useMapStore } from "../../stores/mapStore";
 import { useResourcesStore } from "../../stores/resourcesStore";
 import { hexToId } from "../../utils/hexUtils";
 import SharedButton from "../ui/SharedButton";
-import SharedPanel from "../ui/SharedPanel";
 import {
   BUILDING_TYPES,
   formatTerritoryType,
   getTerritoryBuildingSlotLimit,
+  canBuildInTerritory,
+  getResourceColor,
 } from "../../utils/gameUtils";
 
 /**
  * BuildingPanel component for managing building construction and upgrades
- * Fixed to work with refactored resources store
+ * Refactored to use centralized utility functions
  */
 const BuildingPanel = React.memo(({ selectedTerritory, onClose }) => {
   const [selectedBuildingType, setSelectedBuildingType] = useState(null);
@@ -38,12 +39,11 @@ const BuildingPanel = React.memo(({ selectedTerritory, onClose }) => {
   const upgradeBuilding = useMapStore((state) => state.upgradeBuilding);
 
   // Get resources from resourcesStore with individual selectors
-  // Important: With our refactored store, we select individual resources directly
   const productionResource = useResourcesStore((state) => state.production);
   const updateResource = useResourcesStore((state) => state.updateResource);
 
-  // Building types and their costs - memoized to prevent recreating on every render
-  const buildingTypes = useMemo(() => Object.values(BUILDING_TYPES), []);
+  // Building types - using existing constants instead of recreating
+  const buildingTypes = Object.values(BUILDING_TYPES);
 
   // Check if we have a valid selected territory
   if (!selectedTerritory) {
@@ -63,22 +63,8 @@ const BuildingPanel = React.memo(({ selectedTerritory, onClose }) => {
   const territoryId = hexToId(selectedTerritory);
   const territory = territories[territoryId] || {};
 
-  // Check if a building can be constructed in this territory
-  const canBuildInTerritory = (building) => {
-    if (!territory.type) return false;
-    if (!territory.isOwned) return false;
-
-    // Check building slot limit
-    const slotLimit = getTerritoryBuildingSlotLimit(territory);
-    if ((territory.buildings?.length || 0) >= slotLimit) return false;
-
-    // Check if territory type is suitable
-    return building.requirements.territoryTypes.includes(territory.type);
-  };
-
   // Check if we have enough resources to build
   const canAffordBuilding = (building) => {
-    // Make sure productionResource exists and has an amount property
     return (productionResource?.amount || 0) >= building.productionCost;
   };
 
@@ -231,8 +217,10 @@ const BuildingPanel = React.memo(({ selectedTerritory, onClose }) => {
         </Heading>
         <VStack spacing={3} align="stretch">
           {buildingTypes.map((building) => {
+            // Use utility function for territory checks
             const canBuild =
-              canBuildInTerritory(building) && canAffordBuilding(building);
+              canBuildInTerritory(building, territory) &&
+              canAffordBuilding(building);
 
             return (
               <Box
@@ -267,13 +255,13 @@ const BuildingPanel = React.memo(({ selectedTerritory, onClose }) => {
                   {building.description}
                 </Text>
 
-                {!canBuildInTerritory(building) && (
+                {!canBuildInTerritory(building, territory) && (
                   <Text color="status.danger" fontSize="xs">
                     Cannot build in this territory type
                   </Text>
                 )}
 
-                {canBuildInTerritory(building) &&
+                {canBuildInTerritory(building, territory) &&
                   !canAffordBuilding(building) && (
                     <Text color="status.danger" fontSize="xs">
                       Not enough production points
