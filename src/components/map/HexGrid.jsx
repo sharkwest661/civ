@@ -12,12 +12,13 @@ import {
   generateHexGrid,
   calculateBoundingBox,
   hexToId,
+  getNeighbors, // Make sure this is in hexUtils.js or add it
 } from "../../utils/hexUtils";
 import { MAP_CONFIG } from "../../constants/gameConstants";
 
 /**
  * HexGrid component renders the game map as a collection of hexagonal territories
- * Fixed to ensure proper rendering of the hex map
+ * Enhanced with keyboard navigation support
  */
 const HexGrid = React.memo(
   ({
@@ -41,6 +42,11 @@ const HexGrid = React.memo(
     // State for tracking the hovered hex
     const [hoveredHex, setHoveredHex] = useState(null);
 
+    // State for tracking the currently focused hex for keyboard navigation
+    const [focusedHex, setFocusedHex] = useState(
+      selectedHex || (hexes.length > 0 ? hexes[0] : null)
+    );
+
     // State for tracking active tooltips
     const [activeTooltips, setActiveTooltips] = useState({});
 
@@ -50,6 +56,14 @@ const HexGrid = React.memo(
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const svgRef = useRef(null);
+    const gridRef = useRef(null);
+
+    // Update focused hex when selected hex changes
+    useEffect(() => {
+      if (selectedHex) {
+        setFocusedHex(selectedHex);
+      }
+    }, [selectedHex]);
 
     // Handle mouse down for panning
     const handleMouseDown = useCallback(
@@ -134,7 +148,78 @@ const HexGrid = React.memo(
       });
     }, []);
 
-    // Add event listeners for pan/zoom
+    // Handle keyboard navigation
+    const handleKeyDown = useCallback(
+      (e) => {
+        if (!focusedHex) return;
+
+        const { q, r } = focusedHex;
+        let newQ = q;
+        let newR = r;
+
+        // Hex grid keyboard navigation
+        // This uses the axial coordinate system for hex grids
+        switch (e.key) {
+          // For even-q offset grid (adjust if using a different offset)
+          case "ArrowRight":
+            newQ += 1;
+            break;
+          case "ArrowLeft":
+            newQ -= 1;
+            break;
+          case "ArrowUp":
+            if (q % 2 === 0) {
+              newR -= 1;
+            } else {
+              newR -= 1;
+              newQ += 0; // No change in q
+            }
+            break;
+          case "ArrowDown":
+            if (q % 2 === 0) {
+              newR += 1;
+            } else {
+              newR += 1;
+              newQ += 0; // No change in q
+            }
+            break;
+          case "Enter":
+          case " ":
+            e.preventDefault();
+            if (focusedHex) {
+              onHexClick({
+                q: focusedHex.q,
+                r: focusedHex.r,
+                territory: territories[hexToId(focusedHex)] || {},
+              });
+            }
+            break;
+          default:
+            return; // Exit if not handling this key
+        }
+
+        // Find if the new coordinates match a valid hex
+        const targetHexId = `${newQ},${newR}`;
+        const hexExists = hexes.some((hex) => hexToId(hex) === targetHexId);
+
+        if (hexExists) {
+          e.preventDefault(); // Prevent default only if we're handling this
+          const newHex = { q: newQ, r: newR };
+          setFocusedHex(newHex);
+
+          // Programmatically focus the element
+          const hexElement = document.querySelector(
+            `[data-q="${newQ}"][data-r="${newR}"]`
+          );
+          if (hexElement) {
+            hexElement.focus();
+          }
+        }
+      },
+      [focusedHex, hexes, onHexClick, territories]
+    );
+
+    // Add event listeners for pan/zoom and keyboard navigation
     useEffect(() => {
       const svg = svgRef.current;
       if (!svg) return;
@@ -144,12 +229,16 @@ const HexGrid = React.memo(
       document.addEventListener("mouseup", handleMouseUp);
       document.addEventListener("mousemove", handleMouseMove);
 
+      // Add keyboard navigation to the SVG element
+      svg.addEventListener("keydown", handleKeyDown);
+
       return () => {
         svg.removeEventListener("wheel", handleWheel);
         document.removeEventListener("mouseup", handleMouseUp);
         document.removeEventListener("mousemove", handleMouseMove);
+        svg.removeEventListener("keydown", handleKeyDown);
       };
-    }, [handleWheel, handleMouseUp, handleMouseMove]);
+    }, [handleWheel, handleMouseUp, handleMouseMove, handleKeyDown]);
 
     // Handle hex mouse enter
     const handleHexEnter = useCallback((hex) => {
@@ -205,6 +294,8 @@ const HexGrid = React.memo(
                 boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
                 zIndex: 100, // Ensure the tooltip has a high z-index
               }}
+              role="tooltip"
+              id={`tooltip-${q}-${r}`}
             >
               <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
                 Coordinates: ({q}, {r})
@@ -246,6 +337,9 @@ const HexGrid = React.memo(
         const isHovered = hoveredHex
           ? hoveredHex.q === hex.q && hoveredHex.r === hex.r
           : false;
+        const isFocused = focusedHex
+          ? focusedHex.q === hex.q && focusedHex.r === hex.r
+          : false;
 
         return (
           <HexTile
@@ -254,7 +348,7 @@ const HexGrid = React.memo(
             r={hex.r}
             size={hexSize}
             territory={territory}
-            selected={isSelected}
+            selected={isSelected || isFocused}
             hovered={isHovered}
             onClick={onHexClick}
             onMouseEnter={handleHexEnter}
@@ -270,6 +364,7 @@ const HexGrid = React.memo(
       hexSize,
       selectedHex,
       hoveredHex,
+      focusedHex,
       onHexClick,
       handleHexEnter,
       handleHexLeave,
@@ -298,18 +393,49 @@ const HexGrid = React.memo(
             touchAction: "none", // Disable browser gestures
           }}
           data-testid="hex-grid-svg"
+          aria-label="Game map"
+          role="application"
+          aria-roledescription="Hexagonal grid map"
+          tabIndex="0" // Make SVG focusable
+          aria-activedescendant={
+            focusedHex ? `hex-${focusedHex.q}-${focusedHex.r}` : undefined
+          }
         >
           {/* Apply pan and zoom transformations */}
           <g
+            ref={gridRef}
             transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoomLevel})`}
+            role="grid"
+            aria-label="Map grid"
           >
             {/* Render all hexes */}
             {renderHexes()}
           </g>
 
           {/* Render tooltips on top level */}
-          <g className="tooltips-layer">{renderTooltips()}</g>
+          <g className="tooltips-layer" aria-hidden="true">
+            {renderTooltips()}
+          </g>
+
+          {/* Descriptive title for screen readers */}
+          <title>Empire's Legacy Game Map</title>
+          <desc>
+            Hexagonal map grid showing territories, resources, and buildings in
+            Empire's Legacy strategy game.
+          </desc>
         </svg>
+
+        {/* Skip link target */}
+        <div
+          id="map-controls"
+          style={{ position: "absolute", top: "-9999px" }}
+          tabIndex="-1"
+        >
+          <p className="sr-only">
+            Use arrow keys to navigate the map. Press Enter or Space to select a
+            territory.
+          </p>
+        </div>
       </Box>
     );
   }

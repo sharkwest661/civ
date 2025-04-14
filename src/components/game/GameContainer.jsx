@@ -31,10 +31,25 @@ import { useMapStore } from "../../stores/mapStore";
 import { useResourcesStore } from "../../stores/resourcesStore";
 import { useWorkersStore } from "../../stores/workersStore";
 import { hexToId } from "../../utils/hexUtils";
+import { ScreenReaderAnnouncer } from "../accessibility/AccessibilityComponents";
+
+// Create screen reader only class style
+// Adding this to index.css would be better for a real application
+const srOnlyStyles = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  borderWidth: 0,
+};
 
 /**
  * GameContainer is the main component that brings together all game elements
- * Updated to use refactored stores correctly
+ * Enhanced with accessibility features
  */
 const GameContainer = () => {
   // Component state
@@ -77,6 +92,38 @@ const GameContainer = () => {
   const handleTerritorySelect = useCallback(
     (hex) => {
       selectTerritory(hex);
+
+      // Announce territory selection for screen readers
+      if (hex && hex.territory) {
+        const territoryType = hex.territory.type
+          ? hex.territory.type.charAt(0).toUpperCase() +
+            hex.territory.type.slice(1)
+          : "Unknown";
+
+        const announcement = `Selected territory at coordinates ${hex.q}, ${
+          hex.r
+        }. 
+                             Type: ${territoryType}. 
+                             ${hex.territory.isOwned ? "Owned territory." : ""}
+                             ${
+                               hex.territory.isCapital
+                                 ? "Capital territory."
+                                 : ""
+                             }
+                             ${
+                               hex.territory.resource
+                                 ? "Contains " +
+                                   hex.territory.resource +
+                                   " resource."
+                                 : ""
+                             }`;
+
+        // Add visually hidden announcement for screen readers
+        const announcer = document.getElementById("territory-announcer");
+        if (announcer) {
+          announcer.textContent = announcement;
+        }
+      }
     },
     [selectTerritory]
   );
@@ -97,6 +144,12 @@ const GameContainer = () => {
 
     // Advance to the next turn
     advanceTurn();
+
+    // Announce turn change for screen readers
+    const announcer = document.getElementById("turn-announcer");
+    if (announcer) {
+      announcer.textContent = `Advanced to turn ${currentTurn + 1}`;
+    }
   }, [
     updateAllResources,
     advanceTurn,
@@ -104,6 +157,7 @@ const GameContainer = () => {
     getAllBuildingProduction,
     territories,
     setResourceProductionRates,
+    currentTurn,
   ]);
 
   // Handle phase change - memoize with useCallback
@@ -131,14 +185,43 @@ const GameContainer = () => {
         default:
           setActiveSidePanel(null);
       }
+
+      // Announce phase change for screen readers
+      const announcer = document.getElementById("phase-announcer");
+      if (announcer) {
+        announcer.textContent = `Changed to ${phase} phase`;
+      }
     },
     [setPhase]
   );
 
   // Toggle side panel - memoize with useCallback
-  const toggleSidePanel = useCallback((panel) => {
-    setActiveSidePanel((prev) => (prev === panel ? null : panel));
-  }, []);
+  const toggleSidePanel = useCallback(
+    (panel) => {
+      setActiveSidePanel((prev) => (prev === panel ? null : panel));
+
+      // Announce panel toggle for screen readers
+      const announcer = document.getElementById("panel-announcer");
+      if (announcer) {
+        const action = activeSidePanel === panel ? "Closed" : "Opened";
+        const panelName =
+          panel === "workers"
+            ? "Worker Assignment"
+            : panel === "building"
+            ? "Building"
+            : panel === "tech"
+            ? "Technology"
+            : panel === "military"
+            ? "Military"
+            : panel === "diplomacy"
+            ? "Diplomacy"
+            : "";
+
+        announcer.textContent = `${action} ${panelName} panel`;
+      }
+    },
+    [activeSidePanel]
+  );
 
   // Set page title
   useEffect(() => {
@@ -233,7 +316,7 @@ const GameContainer = () => {
       default:
         return (
           <Box p={4}>
-            <Heading size="md" color="accent.main" mb={5}>
+            <Heading size="md" color="accent.main" mb={5} as="h2">
               Actions
             </Heading>
 
@@ -242,6 +325,7 @@ const GameContainer = () => {
                 onClick={() => toggleSidePanel("workers")}
                 variant="primary"
                 leftIcon={<Users size={18} />}
+                ariaLabel="Open worker assignment panel"
               >
                 Assign Workers
               </SharedButton>
@@ -250,6 +334,7 @@ const GameContainer = () => {
                 onClick={() => toggleSidePanel("building")}
                 variant="secondary"
                 leftIcon={<Building size={18} />}
+                ariaLabel="Open building construction panel"
               >
                 Build Structure
               </SharedButton>
@@ -258,6 +343,7 @@ const GameContainer = () => {
                 onClick={() => toggleSidePanel("tech")}
                 variant="secondary"
                 leftIcon={<FlaskConical size={18} />}
+                ariaLabel="Open technology research panel"
               >
                 Research Technology
               </SharedButton>
@@ -266,6 +352,7 @@ const GameContainer = () => {
                 onClick={() => toggleSidePanel("military")}
                 variant="secondary"
                 leftIcon={<Sword size={18} />}
+                ariaLabel="Open military operations panel"
               >
                 Military Operations
               </SharedButton>
@@ -274,6 +361,7 @@ const GameContainer = () => {
                 onClick={() => toggleSidePanel("diplomacy")}
                 variant="secondary"
                 leftIcon={<MessageCircle size={18} />}
+                ariaLabel="Open diplomacy panel"
               >
                 Diplomacy
               </SharedButton>
@@ -328,14 +416,16 @@ const GameContainer = () => {
     >
       {/* Top Bar with Resources and Controls */}
       <Flex
+        as="header"
         justify="space-between"
         p={3}
         bg="background.panel"
         borderBottomWidth="1px"
         borderColor="background.highlight"
+        aria-label="Game header"
       >
         <Box>
-          <Heading size="md" color="accent.main" mb={1}>
+          <Heading size="md" color="accent.main" mb={1} as="h1">
             Empire's Legacy
           </Heading>
           <Text fontSize="sm" color="text.secondary">
@@ -350,10 +440,13 @@ const GameContainer = () => {
       <Flex flex="1" overflow="hidden">
         {/* Main Map Area */}
         <Box
+          as="section"
           flex="1"
           position="relative"
           overflow="hidden"
           data-testid="map-container"
+          aria-label="Game map section"
+          id="map-section"
         >
           <MapView
             territories={territories}
@@ -364,12 +457,17 @@ const GameContainer = () => {
 
         {/* Side Panel */}
         <Box
+          as="aside"
           w="550px"
           bg="background.panel"
           borderLeftWidth="1px"
           borderColor="background.highlight"
           overflowY="auto"
           position="relative"
+          aria-label={
+            activeSidePanel ? `${activeSidePanel} panel` : "Game controls panel"
+          }
+          role="complementary"
         >
           {renderSidePanel()}
         </Box>
@@ -377,12 +475,14 @@ const GameContainer = () => {
 
       {/* Bottom Bar with Turn Controls */}
       <Flex
+        as="footer"
         p={3}
         bg="background.panel"
         borderTopWidth="1px"
         borderColor="background.highlight"
         justify="space-between"
         align="center"
+        aria-label="Game controls"
       >
         <Flex gap={2}>
           {/* Phase buttons */}
@@ -396,6 +496,10 @@ const GameContainer = () => {
                   variant={getPhaseButtonVariant(phase)}
                   size="sm"
                   leftIcon={PhaseIcon && <PhaseIcon size={16} />}
+                  ariaLabel={`Change to ${phase} phase${
+                    currentPhase === phase ? " (current phase)" : ""
+                  }`}
+                  aria-pressed={currentPhase === phase}
                 >
                   {phase}
                 </SharedButton>
@@ -406,6 +510,16 @@ const GameContainer = () => {
 
         <TurnControls onEndTurn={handleEndTurn} />
       </Flex>
+
+      {/* Screen reader announcement regions */}
+      <div
+        aria-live="polite"
+        id="territory-announcer"
+        style={srOnlyStyles}
+      ></div>
+      <div aria-live="polite" id="turn-announcer" style={srOnlyStyles}></div>
+      <div aria-live="polite" id="phase-announcer" style={srOnlyStyles}></div>
+      <div aria-live="polite" id="panel-announcer" style={srOnlyStyles}></div>
     </Flex>
   );
 };

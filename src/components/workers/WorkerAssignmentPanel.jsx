@@ -78,12 +78,6 @@ const WorkerAssignmentPanel = ({ onClose }) => {
   // Handle opening the worker pool - fixed to address modal issue
   const openWorkerPool = useCallback(
     (buildingIndex) => {
-      console.log(
-        "Opening worker pool for building:",
-        buildingIndex,
-        "in territory:",
-        territoryId
-      );
       setBuildingForWorker(buildingIndex);
       onOpen();
     },
@@ -92,7 +86,6 @@ const WorkerAssignmentPanel = ({ onClose }) => {
 
   // Handle viewing all workers
   const openAllWorkers = useCallback(() => {
-    console.log("Opening worker pool for all workers");
     setBuildingForWorker(null);
     onOpen();
   }, [onOpen]);
@@ -100,14 +93,6 @@ const WorkerAssignmentPanel = ({ onClose }) => {
   // Handle worker selection from the pool - fixed to use territoryId properly
   const handleWorkerSelected = useCallback(
     (workerId) => {
-      console.log(
-        "Worker selected:",
-        workerId,
-        "for building:",
-        buildingForWorker,
-        "in territory:",
-        territoryId
-      );
       if (buildingForWorker !== null && workerId && territoryId) {
         assignWorker(territoryId, buildingForWorker, workerId);
       }

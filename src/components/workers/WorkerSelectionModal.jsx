@@ -22,14 +22,17 @@ import { User, Users, Brain, Briefcase, Award, Dumbbell } from "lucide-react";
 
 import { useWorkersStore } from "../../stores/workersStore";
 import SharedButton from "../ui/SharedButton";
-import { WORKER_SPECIALIZATIONS } from "../../constants/gameConstants";
+import {
+  getWorkerSpecializationInfo,
+  formatSubtype,
+  isWorkerIdealForBuilding,
+} from "../../utils/gameUtils";
 
 /**
  * WorkerSelectionModal component
  *
  * A standalone modal specifically for selecting workers to assign to buildings.
- * This component directly uses Chakra UI Modal to ensure it renders correctly
- * regardless of territory position.
+ * Refactored to use centralized utility functions for worker specializations.
  */
 const WorkerSelectionModal = ({
   isOpen,
@@ -62,79 +65,6 @@ const WorkerSelectionModal = ({
       onClose();
     }
   }, [selectedWorkerId, onSelectWorker, onClose]);
-
-  // Format subtype name for display
-  const formatSubtype = useCallback((subtype) => {
-    return subtype ? subtype.charAt(0).toUpperCase() + subtype.slice(1) : "";
-  }, []);
-
-  // Get worker specialization information
-  const getSpecializationInfo = useCallback(
-    (workerId) => {
-      if (!workerId || !workerSpecializations[workerId]) return null;
-
-      const specialization = workerSpecializations[workerId];
-
-      let Icon, color, description;
-
-      switch (specialization.type) {
-        case "diligent":
-          Icon = Briefcase;
-          color = "resource.gold";
-          description = `+15% ${specialization.subtype} production`;
-          break;
-        case "strong":
-          Icon = Dumbbell;
-          color = "resource.production";
-          description = `+15% ${specialization.subtype} efficiency`;
-          break;
-        case "clever":
-          Icon = Brain;
-          color = "resource.science";
-          description = `+15% ${specialization.subtype} output`;
-          break;
-        default:
-          return null;
-      }
-
-      return {
-        Icon,
-        color,
-        name:
-          specialization.type.charAt(0).toUpperCase() +
-          specialization.type.slice(1),
-        subtype: specialization.subtype,
-        description,
-      };
-    },
-    [workerSpecializations]
-  );
-
-  // Check if a worker is ideal for this building type
-  const isIdealForBuilding = useCallback(
-    (workerId) => {
-      if (!workerId || !workerSpecializations[workerId] || !buildingType)
-        return false;
-
-      const specialization = workerSpecializations[workerId];
-
-      // Match building types to worker specializations
-      const buildingToSpecialization = {
-        farm: "farming",
-        mine: "production",
-        library: "science",
-        market: "gold",
-      };
-
-      const idealSubtype = buildingToSpecialization[buildingType];
-
-      return (
-        specialization.type === "diligent" &&
-        specialization.subtype === idealSubtype
-      );
-    },
-    [workerSpecializations, buildingType]
-  );
 
   return (
     <Modal
@@ -179,9 +109,16 @@ const WorkerSelectionModal = ({
               pr={2}
             >
               {availableWorkers.map((worker) => {
-                const specInfo = getSpecializationInfo(worker.id);
+                // Use utility functions instead of inline logic
+                const specInfo = getWorkerSpecializationInfo(
+                  workerSpecializations[worker.id]
+                );
                 const isSelected = selectedWorkerId === worker.id;
-                const isIdeal = isIdealForBuilding(worker.id);
+                const isIdeal = isWorkerIdealForBuilding(
+                  worker.id,
+                  workerSpecializations,
+                  buildingType
+                );
 
                 return (
                   <Box

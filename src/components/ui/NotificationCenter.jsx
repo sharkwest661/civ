@@ -1,7 +1,10 @@
+// src/components/ui/NotificationCenter.jsx
 import React, { useState, useEffect } from "react";
+import { getNotificationColor } from "../../utils/gameUtils";
 
 /**
  * NotificationCenter component for displaying game notifications and alerts
+ * Refactored to use centralized utility functions for colors
  */
 const NotificationCenter = React.memo(({ notifications = [], onDismiss }) => {
   const [visibleNotifications, setVisibleNotifications] = useState([]);
@@ -102,23 +105,6 @@ const NotificationCenter = React.memo(({ notifications = [], onDismiss }) => {
     </div>
   );
 });
-
-// Helper function to get notification background color
-function getNotificationColor(type) {
-  switch (type) {
-    case "success":
-      return "#2e4c34"; // Green
-    case "warning":
-      return "#4c3e2e"; // Yellow-orange
-    case "danger":
-      return "#4c2e2e"; // Red
-    case "special":
-      return "#3e2e4c"; // Purple
-    case "info":
-    default:
-      return "#2e3e4c"; // Blue
-  }
-}
 
 // Add display name for debugging
 NotificationCenter.displayName = "NotificationCenter";
