@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { ChakraProvider } from "@chakra-ui/react";
-import GameContainer from "./components/game/GameContainer";
+import GameContainer from "./components/game/GameContainer"; // Updated import
 import { useGameStore } from "./stores/gameStore";
 import { useMapStore } from "./stores/mapStore";
 import { useResourcesStore } from "./stores/resourcesStore";
 import { useTechnologyStore } from "./stores/technologyStore";
+import { useWorkersStore } from "./stores/workersStore"; // Import workers store
 import { theme } from "./theme";
 
 function App() {
@@ -30,6 +31,9 @@ function App() {
   );
   const currentResearch = useTechnologyStore((state) => state.currentResearch);
 
+  // Add workers store initialization
+  const initializeWorkers = useWorkersStore((state) => state.initializeWorkers);
+
   // Initialize the game only once on component mount
   useEffect(() => {
     if (!isInitialized) {
@@ -44,13 +48,22 @@ function App() {
       // Initialize map with territories
       initializeMap();
 
+      // Initialize workers (start with 5 workers)
+      initializeWorkers(5);
+
       // Start the game
       startGame();
 
       // Set initialization flag
       setIsInitialized(true);
     }
-  }, [isInitialized, initializeMap, initializeResources, startGame]);
+  }, [
+    isInitialized,
+    initializeMap,
+    initializeResources,
+    initializeWorkers,
+    startGame,
+  ]);
 
   // Update research progress when turn changes
   useEffect(() => {

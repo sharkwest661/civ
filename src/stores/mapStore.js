@@ -94,6 +94,20 @@ export const useMapStore = create((set, get) => ({
       const territory = state.territories[hexId] || {};
       const buildings = territory.buildings || [];
 
+      // Get slot limit based on territory type
+      let slotLimit = 1; // Default for regular territories
+
+      if (territory.isCapital) {
+        slotLimit = 2; // Capital gets 2 slots
+      } else if (territory.resource) {
+        slotLimit = 2; // Resource-rich territories get 2 slots
+      }
+
+      // Check if we've reached the slot limit
+      if (buildings.length >= slotLimit) {
+        return state; // Can't add more buildings
+      }
+
       return {
         territories: {
           ...state.territories,
