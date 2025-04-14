@@ -14,7 +14,7 @@ import {
   Icon,
   useToast,
 } from "@chakra-ui/react";
-import { Flask, Check, Beaker, History } from "lucide-react";
+import { FlaskConical, Check, Beaker, History } from "lucide-react";
 import { useTechnologyStore } from "../../stores/technologyStore";
 import SharedButton from "../ui/SharedButton";
 import TechnologyTooltip from "./TechnologyTooltip";
@@ -200,7 +200,7 @@ const TechnologyTree = React.memo(({ onClose }) => {
           <VStack align="stretch" spacing={2}>
             <Flex justify="space-between" align="center">
               <Flex align="center">
-                <Icon as={Flask} color="resource.science" mr={2} />
+                <Icon as={FlaskConical} color="resource.science" mr={2} />
                 <Text color="resource.science" fontWeight="bold">
                   {technologies[currentResearch].name}
                 </Text>
