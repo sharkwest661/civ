@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx - Updated with military integration
 import React, { useEffect, useState, useCallback } from "react";
 import {
   ChakraProvider,
@@ -10,11 +10,13 @@ import {
 } from "@chakra-ui/react";
 import GameContainer from "./components/game/GameContainer";
 import ErrorBoundary from "./components/common/ErrorBoundary";
+import GameIntegration from "./components/game/GameIntegration"; // Added for military integration
 import { useGameStore } from "./stores/gameStore";
 import { useMapStore } from "./stores/mapStore";
 import { useResourcesStore } from "./stores/resourcesStore";
 import { useTechnologyStore } from "./stores/technologyStore";
 import { useWorkersStore } from "./stores/workersStore";
+import { useMilitaryStore } from "./stores/militaryStore"; // Added for military system
 import { theme } from "./theme";
 import { SkipToMainContent } from "./components/accessibility/AccessibilityComponents";
 
@@ -43,6 +45,11 @@ function App() {
   // Add workers store initialization
   const initializeWorkers = useWorkersStore((state) => state.initializeWorkers);
 
+  // Add military store initialization
+  const initializeMilitary = useMilitaryStore(
+    (state) => state.initializeMilitary
+  );
+
   // Reset function for error boundary
   const handleReset = useCallback(() => {
     setIsInitialized(false);
@@ -68,6 +75,9 @@ function App() {
         // Initialize workers (start with 5 workers)
         initializeWorkers(5);
 
+        // Initialize military system
+        initializeMilitary();
+
         // Start the game
         startGame();
 
@@ -84,6 +94,7 @@ function App() {
     initializeMap,
     initializeResources,
     initializeWorkers,
+    initializeMilitary, // Added to dependency array
     startGame,
   ]);
 
@@ -178,6 +189,9 @@ function App() {
               w="100%"
               aria-label="Empire's Legacy Game"
             >
+              {/* Game Integration component for handling game systems */}
+              <GameIntegration />
+
               <GameContainer />
             </Box>
           ) : (
