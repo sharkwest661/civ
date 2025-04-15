@@ -1,5 +1,5 @@
-// src/components/game/GameContainer.jsx
-import React, { useEffect, useState, useCallback } from "react";
+// src/components/game/GameContainer.jsx - Updated with Military Panel integration
+import React, { useState, useCallback } from "react";
 import {
   Box,
   Flex,
@@ -7,8 +7,8 @@ import {
   Text,
   VStack,
   HStack,
-  IconButton,
-  Divider,
+  Badge,
+  Icon,
 } from "@chakra-ui/react";
 import {
   Users,
@@ -16,7 +16,6 @@ import {
   FlaskConical,
   Sword,
   MessageCircle,
-  X,
 } from "lucide-react";
 import MapView from "../map/MapView";
 import ResourcePanel from "../resources/ResourcePanel";
@@ -24,32 +23,15 @@ import TurnControls from "./TurnControls";
 import BuildingPanel from "../buildings/BuildingPanel";
 import TechnologyTree from "../technology/TechnologyTree";
 import WorkerAssignmentPanel from "../workers/WorkerAssignmentPanel";
+import MilitaryPanel from "../military/MilitaryPanel"; // Import the Military Panel
 import SharedButton from "../ui/SharedButton";
-import SharedPanel from "../ui/SharedPanel";
 import { useGameStore } from "../../stores/gameStore";
 import { useMapStore } from "../../stores/mapStore";
-import { useResourcesStore } from "../../stores/resourcesStore";
-import { useWorkersStore } from "../../stores/workersStore";
-import { hexToId } from "../../utils/hexUtils";
 import { ScreenReaderAnnouncer } from "../accessibility/AccessibilityComponents";
-
-// Create screen reader only class style
-// Adding this to index.css would be better for a real application
-const srOnlyStyles = {
-  position: "absolute",
-  width: "1px",
-  height: "1px",
-  padding: 0,
-  margin: "-1px",
-  overflow: "hidden",
-  clip: "rect(0, 0, 0, 0)",
-  whiteSpace: "nowrap",
-  borderWidth: 0,
-};
 
 /**
  * GameContainer is the main component that brings together all game elements
- * Enhanced with accessibility features
+ * Enhanced with accessibility features and military panel integration
  */
 const GameContainer = () => {
   // Component state
@@ -67,26 +49,6 @@ const GameContainer = () => {
   const territories = useMapStore((state) => state.territories);
   const selectedTerritory = useMapStore((state) => state.selectedTerritory);
   const selectTerritory = useMapStore((state) => state.selectTerritory);
-
-  // Resources store selectors
-  // Update to use the refactored resource store structure
-  const setResourceProduction = useResourcesStore(
-    (state) => state.setResourceProduction
-  );
-  const updateAllResources = useResourcesStore(
-    (state) => state.updateAllResources
-  );
-  const setResourceProductionRates = useResourcesStore(
-    (state) => state.setResourceProductionRates
-  );
-
-  // Workers store selectors
-  const clearRecentlyReassigned = useWorkersStore(
-    (state) => state.clearRecentlyReassigned
-  );
-  const getAllBuildingProduction = useWorkersStore(
-    (state) => state.getAllBuildingProduction
-  );
 
   // Handle territory selection - memoize with useCallback
   const handleTerritorySelect = useCallback(
@@ -130,18 +92,6 @@ const GameContainer = () => {
 
   // Handle end turn - memoize with useCallback
   const handleEndTurn = useCallback(() => {
-    // Calculate production from workers
-    const workerProduction = getAllBuildingProduction(territories);
-
-    // Update resource production rates - use new bulk update function
-    setResourceProductionRates(workerProduction);
-
-    // Update all resources based on production
-    updateAllResources();
-
-    // Clear recently reassigned workers penalty
-    clearRecentlyReassigned();
-
     // Advance to the next turn
     advanceTurn();
 
@@ -150,15 +100,7 @@ const GameContainer = () => {
     if (announcer) {
       announcer.textContent = `Advanced to turn ${currentTurn + 1}`;
     }
-  }, [
-    updateAllResources,
-    advanceTurn,
-    clearRecentlyReassigned,
-    getAllBuildingProduction,
-    territories,
-    setResourceProductionRates,
-    currentTurn,
-  ]);
+  }, [advanceTurn, currentTurn]);
 
   // Handle phase change - memoize with useCallback
   const handlePhaseChange = useCallback(
@@ -177,7 +119,7 @@ const GameContainer = () => {
           setActiveSidePanel("tech");
           break;
         case "Military":
-          setActiveSidePanel("military");
+          setActiveSidePanel("military"); // Set the military panel as active
           break;
         case "Diplomacy":
           setActiveSidePanel("diplomacy");
@@ -222,11 +164,6 @@ const GameContainer = () => {
     },
     [activeSidePanel]
   );
-
-  // Set page title
-  useEffect(() => {
-    document.title = "Empire's Legacy";
-  }, []);
 
   // Get phase button variant based on current phase
   const getPhaseButtonVariant = useCallback(
@@ -274,24 +211,8 @@ const GameContainer = () => {
         return <TechnologyTree onClose={() => setActiveSidePanel(null)} />;
 
       case "military":
-        return (
-          <Box p={4}>
-            <Flex justify="space-between" align="center" mb={4}>
-              <Heading size="md" color="accent.main">
-                Military Panel
-              </Heading>
-              <IconButton
-                icon={<X size={18} />}
-                aria-label="Close panel"
-                variant="ghost"
-                onClick={() => setActiveSidePanel(null)}
-              />
-            </Flex>
-            <Text color="text.secondary">
-              Military panel would be implemented here.
-            </Text>
-          </Box>
-        );
+        // Render the MilitaryPanel component
+        return <MilitaryPanel onClose={() => setActiveSidePanel(null)} />;
 
       case "diplomacy":
         return (
@@ -300,12 +221,13 @@ const GameContainer = () => {
               <Heading size="md" color="accent.main">
                 Diplomacy Panel
               </Heading>
-              <IconButton
-                icon={<X size={18} />}
-                aria-label="Close panel"
+              <SharedButton
                 variant="ghost"
+                size="sm"
                 onClick={() => setActiveSidePanel(null)}
-              />
+              >
+                ✕
+              </SharedButton>
             </Flex>
             <Text color="text.secondary">
               Diplomacy panel would be implemented here.
@@ -324,7 +246,7 @@ const GameContainer = () => {
               <SharedButton
                 onClick={() => toggleSidePanel("workers")}
                 variant="primary"
-                leftIcon={<Users size={18} />}
+                leftIcon={<Icon as={Users} boxSize={5} />}
                 ariaLabel="Open worker assignment panel"
               >
                 Assign Workers
@@ -333,7 +255,7 @@ const GameContainer = () => {
               <SharedButton
                 onClick={() => toggleSidePanel("building")}
                 variant="secondary"
-                leftIcon={<Building size={18} />}
+                leftIcon={<Icon as={Building} boxSize={5} />}
                 ariaLabel="Open building construction panel"
               >
                 Build Structure
@@ -342,7 +264,7 @@ const GameContainer = () => {
               <SharedButton
                 onClick={() => toggleSidePanel("tech")}
                 variant="secondary"
-                leftIcon={<FlaskConical size={18} />}
+                leftIcon={<Icon as={FlaskConical} boxSize={5} />}
                 ariaLabel="Open technology research panel"
               >
                 Research Technology
@@ -351,7 +273,7 @@ const GameContainer = () => {
               <SharedButton
                 onClick={() => toggleSidePanel("military")}
                 variant="secondary"
-                leftIcon={<Sword size={18} />}
+                leftIcon={<Icon as={Sword} boxSize={5} />}
                 ariaLabel="Open military operations panel"
               >
                 Military Operations
@@ -360,7 +282,7 @@ const GameContainer = () => {
               <SharedButton
                 onClick={() => toggleSidePanel("diplomacy")}
                 variant="secondary"
-                leftIcon={<MessageCircle size={18} />}
+                leftIcon={<Icon as={MessageCircle} boxSize={5} />}
                 ariaLabel="Open diplomacy panel"
               >
                 Diplomacy
@@ -369,7 +291,7 @@ const GameContainer = () => {
 
             {selectedTerritory && (
               <Box mt={4}>
-                <SharedPanel title="Selected Territory">
+                <Box bg="background.ui" p={3} borderRadius="md">
                   <VStack align="stretch" spacing={1}>
                     <Text fontSize="sm">
                       Coordinates: ({selectedTerritory.q}, {selectedTerritory.r}
@@ -396,7 +318,7 @@ const GameContainer = () => {
                       </>
                     )}
                   </VStack>
-                </SharedPanel>
+                </Box>
               </Box>
             )}
           </Box>
@@ -515,11 +437,63 @@ const GameContainer = () => {
       <div
         aria-live="polite"
         id="territory-announcer"
-        style={srOnlyStyles}
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          borderWidth: 0,
+        }}
       ></div>
-      <div aria-live="polite" id="turn-announcer" style={srOnlyStyles}></div>
-      <div aria-live="polite" id="phase-announcer" style={srOnlyStyles}></div>
-      <div aria-live="polite" id="panel-announcer" style={srOnlyStyles}></div>
+      <div
+        aria-live="polite"
+        id="turn-announcer"
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          borderWidth: 0,
+        }}
+      ></div>
+      <div
+        aria-live="polite"
+        id="phase-announcer"
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          borderWidth: 0,
+        }}
+      ></div>
+      <div
+        aria-live="polite"
+        id="panel-announcer"
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          borderWidth: 0,
+        }}
+      ></div>
     </Flex>
   );
 };
