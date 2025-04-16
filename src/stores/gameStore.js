@@ -1,3 +1,4 @@
+// src/stores/gameStore.js - Fixed to prevent state update loops
 import { create } from "zustand";
 
 /**
@@ -16,6 +17,7 @@ export const useGameStore = create((set, get) => ({
   gameStarted: false,
   gamePaused: false,
   gameEnded: false,
+  turnProcessing: false, // NEW - Flag to prevent multiple turn processing
 
   // Player state
   currentPlayer: {
@@ -65,16 +67,28 @@ export const useGameStore = create((set, get) => ({
   resumeGame: () => set({ gamePaused: false }),
   endGame: () => set({ gameEnded: true }),
 
-  // Turn management
+  // Turn management - FIXED to prevent infinite loops
   advanceTurn: () => {
-    const currentTurn = get().currentTurn;
+    // Get current state
+    const { currentTurn, turnProcessing } = get();
+
+    // Don't process if we're already processing a turn change
+    if (turnProcessing) return;
+
+    // Set the processing flag to true
+    set({ turnProcessing: true });
+
+    // Update the turn counter and reset phase
     set({
       currentTurn: currentTurn + 1,
       currentPhase: "Assignment", // Reset to first phase on new turn
     });
 
-    // This would be where we trigger AI turns, resource updates, etc.
-    // We'll implement this later
+    // After a slight delay, reset the processing flag
+    // This prevents multiple rapid turn advancements
+    setTimeout(() => {
+      set({ turnProcessing: false });
+    }, 100);
   },
 
   // Phase management

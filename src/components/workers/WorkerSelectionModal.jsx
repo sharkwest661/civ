@@ -1,5 +1,5 @@
-// src/components/workers/WorkerSelectionModal.jsx
-import React, { useState, useCallback } from "react";
+// src/components/workers/WorkerSelectionModal.jsx - Fixed specialization display
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Modal,
   ModalOverlay,
@@ -32,7 +32,7 @@ import {
  * WorkerSelectionModal component
  *
  * A standalone modal specifically for selecting workers to assign to buildings.
- * Refactored to use centralized utility functions for worker specializations.
+ * Fixed to properly display worker specializations.
  */
 const WorkerSelectionModal = ({
   isOpen,
@@ -52,6 +52,34 @@ const WorkerSelectionModal = ({
 
   // State for selected worker
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
+
+  // Debug logging to help diagnose specialization issues
+  useEffect(() => {
+    if (isOpen) {
+      console.log("Worker specializations in modal:", workerSpecializations);
+      console.log("Available workers:", availableWorkers);
+
+      // Check each worker's specialization
+      availableWorkers.forEach((worker) => {
+        const spec = workerSpecializations[worker.id];
+        console.log(`Worker ${worker.id} specialization:`, spec);
+      });
+    }
+  }, [isOpen, availableWorkers, workerSpecializations]);
+
+  // Helper to get icon for a specialization type
+  const getSpecializationIcon = (type) => {
+    switch (type) {
+      case "diligent":
+        return Briefcase;
+      case "strong":
+        return Dumbbell;
+      case "clever":
+        return Brain;
+      default:
+        return User;
+    }
+  };
 
   // Handler for selecting worker
   const handleSelectWorker = useCallback((workerId) => {
@@ -109,10 +137,37 @@ const WorkerSelectionModal = ({
               pr={2}
             >
               {availableWorkers.map((worker) => {
-                // Use utility functions instead of inline logic
-                const specInfo = getWorkerSpecializationInfo(
-                  workerSpecializations[worker.id]
-                );
+                // Direct debugging of this specific worker's specialization
+                const directSpec = workerSpecializations[worker.id];
+                console.log(`Rendering worker ${worker.id}:`, directSpec);
+
+                // Use utility function with fallback to direct access if it fails
+                let specInfo = getWorkerSpecializationInfo(directSpec);
+
+                // Fallback direct approach if utility function fails
+                if (!specInfo && directSpec) {
+                  const iconComponent = getSpecializationIcon(directSpec.type);
+                  specInfo = {
+                    icon: iconComponent || User,
+                    color:
+                      directSpec.type === "diligent"
+                        ? "resource.gold"
+                        : directSpec.type === "strong"
+                        ? "resource.production"
+                        : directSpec.type === "clever"
+                        ? "resource.science"
+                        : "text.primary",
+                    name:
+                      directSpec.type.charAt(0).toUpperCase() +
+                      directSpec.type.slice(1),
+                    subtype: directSpec.subtype,
+                    description: `+${directSpec.bonus * 100}% ${
+                      directSpec.subtype
+                    } bonus`,
+                  };
+                  console.log("Created fallback specInfo:", specInfo);
+                }
+
                 const isSelected = selectedWorkerId === worker.id;
                 const isIdeal = isWorkerIdealForBuilding(
                   worker.id,
@@ -157,11 +212,13 @@ const WorkerSelectionModal = ({
                     <Flex justify="space-between" align="center">
                       <Flex align="center">
                         <Icon
-                          as={specInfo?.Icon || User}
+                          as={specInfo?.icon || User}
                           color={specInfo?.color || "text.primary"}
                           mr={2}
                         />
-                        <Text fontWeight="medium">Worker</Text>
+                        <Text fontWeight="medium">
+                          {specInfo ? `${specInfo.name} Worker` : "Worker"}
+                        </Text>
                       </Flex>
 
                       {specInfo && (
@@ -180,6 +237,14 @@ const WorkerSelectionModal = ({
                     {specInfo && (
                       <Text fontSize="xs" color="text.secondary" mt={1}>
                         {specInfo.description}
+                      </Text>
+                    )}
+
+                    {/* Debug indicator */}
+                    {!specInfo && directSpec && (
+                      <Text fontSize="xs" color="status.warning" mt={1}>
+                        {directSpec.type} - {directSpec.subtype} (Raw data
+                        available)
                       </Text>
                     )}
                   </Box>
