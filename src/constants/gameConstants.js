@@ -10,7 +10,7 @@ export const GAME_PHASES = {
   BUILDING: "Building",
   RESEARCH: "Research",
   MILITARY: "Military",
-  DIPLOMACY: "Diplomacy",
+  // DIPLOMACY: "Diplomacy", // Removed diplomacy phase
 };
 
 // Map constants
@@ -51,7 +51,7 @@ export const RESOURCE_TYPES = {
   GOLD: "gold",
   HAPPINESS: "happiness",
   CULTURE: "culture",
-  INFLUENCE: "influence",
+  // INFLUENCE: "influence", // Removed influence resource
 };
 
 // Resource icons and colors
@@ -98,13 +98,7 @@ export const RESOURCE_DISPLAY = {
     description:
       "Culture expands your territory and provides influence over other civilizations.",
   },
-  [RESOURCE_TYPES.INFLUENCE]: {
-    icon: "🤝",
-    color: "resource.influence",
-    name: "Influence",
-    description:
-      "Influence is used for diplomatic actions and agreements with other civilizations.",
-  },
+  // Removed INFLUENCE resource display
 };
 
 // Building types
@@ -175,7 +169,7 @@ export const WORKER_SPECIALIZATIONS = {
     type: "clever",
     name: "Clever",
     bonus: 0.15,
-    subtypes: ["science", "espionage", "diplomacy"],
+    subtypes: ["science", "espionage"], // Removed diplomacy specialization
     description: "More efficient at knowledge tasks",
   },
 };
