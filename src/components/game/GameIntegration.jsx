@@ -6,6 +6,7 @@ import { useResourcesStore } from "../../stores/resourcesStore";
 import { useMilitaryStore } from "../../stores/militaryStore";
 import { useWorkersStore } from "../../stores/workersStore"; // Added workers store
 import { generateUniqueId } from "../../utils/gameUtils";
+import { useVictoryStore } from "../../stores/victoryStore";
 
 /**
  * GameIntegration - Integrates systems with game flow
@@ -21,6 +22,11 @@ const GameIntegration = () => {
   const currentTurn = useGameStore((state) => state.currentTurn);
   const currentPhase = useGameStore((state) => state.currentPhase);
   const gameStarted = useGameStore((state) => state.gameStarted);
+
+  // Victory state
+  const updateCulturalProgress = useVictoryStore(
+    (state) => state.updateCulturalProgress
+  );
 
   // Military state
   const initializeMilitary = useMilitaryStore(
@@ -41,6 +47,7 @@ const GameIntegration = () => {
   );
   const food = useResourcesStore((state) => state.food);
   const gold = useResourcesStore((state) => state.gold);
+  const culture = useResourcesStore((state) => state.culture);
 
   // Worker state
   const addWorker = useWorkersStore((state) => state.addWorker);
@@ -68,6 +75,11 @@ const GameIntegration = () => {
 
         // Update all resources based on their production rates
         updateAllResources();
+
+        // Update cultural progress based on culture production
+        if (culture) {
+          updateCulturalProgress(culture.amount || 0);
+        }
 
         // Handle worker growth based on food production
         // Only process if we have positive food production
@@ -192,6 +204,18 @@ const GameIntegration = () => {
       // Optional: Could trigger notifications or special actions when entering Military phase
     }
   }, [currentPhase]);
+
+  useEffect(() => {
+    if (gameStarted) {
+      // Reset victory state when game starts
+      useVictoryStore.getState().resetVictoryState();
+
+      // Set initial values
+      useVictoryStore.getState().updateMilitaryProgress([]);
+      useVictoryStore.getState().updateCulturalProgress(0);
+      useVictoryStore.getState().updateWonderProgress(false, 0);
+    }
+  }, [gameStarted]);
 
   // This component doesn't render anything visual
   return null;

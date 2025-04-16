@@ -11,12 +11,14 @@ import {
   Icon,
 } from "@chakra-ui/react";
 import {
+  Award,
   Users,
   Building,
   FlaskConical,
   Sword,
   // MessageCircle, // Removed import
 } from "lucide-react";
+
 import MapView from "../map/MapView";
 import ResourcePanel from "../resources/ResourcePanel";
 import TurnControls from "./TurnControls";
@@ -24,10 +26,12 @@ import BuildingPanel from "../buildings/BuildingPanel";
 import TechnologyTree from "../technology/TechnologyTree";
 import WorkerAssignmentPanel from "../workers/WorkerAssignmentPanel";
 import MilitaryPanel from "../military/MilitaryPanel";
-import SharedButton from "../ui/SharedButton";
 import { useGameStore } from "../../stores/gameStore";
 import { useMapStore } from "../../stores/mapStore";
 import { ScreenReaderAnnouncer } from "../accessibility/AccessibilityComponents";
+import VictoryProgressPanel from "../victory/VictoryProgressPanel";
+import VictoryManager from "../victory/VictoryManager";
+import SharedButton from "../ui/SharedButton";
 
 /**
  * GameContainer is the main component that brings together all game elements
@@ -228,6 +232,11 @@ const GameContainer = () => {
         // Render the MilitaryPanel component
         return <MilitaryPanel onClose={() => setActiveSidePanel(null)} />;
 
+      case "victory":
+        return (
+          <VictoryProgressPanel onClose={() => setActiveSidePanel(null)} />
+        );
+
       default:
         return (
           <Box p={4}>
@@ -270,6 +279,15 @@ const GameContainer = () => {
                 ariaLabel="Open military operations panel"
               >
                 Military Operations
+              </SharedButton>
+
+              <SharedButton
+                onClick={() => toggleSidePanel("victory")}
+                variant="secondary"
+                leftIcon={<Icon as={Award} boxSize={5} />}
+                ariaLabel="Open victory progress panel"
+              >
+                Victory Progress
               </SharedButton>
             </VStack>
 
@@ -417,6 +435,8 @@ const GameContainer = () => {
           onOpenResearch={() => handlePhaseChange("Research")}
         />
       </Flex>
+
+      <VictoryManager />
 
       {/* Screen reader announcement regions */}
       <div

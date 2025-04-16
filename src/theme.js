@@ -292,7 +292,6 @@ export const theme = extendTheme({
       },
     },
 
-    // Progress bar styling
     Progress: {
       baseStyle: {
         track: {
@@ -300,31 +299,51 @@ export const theme = extendTheme({
           borderRadius: "full",
         },
         filledTrack: {
-          bg: "status.info",
-          borderRadius: "full",
           transition: "width 0.3s ease-in-out",
         },
       },
       variants: {
-        food: { filledTrack: { bg: "resource.food" } },
-        production: { filledTrack: { bg: "resource.production" } },
-        science: { filledTrack: { bg: "resource.science" } },
-        gold: { filledTrack: { bg: "resource.gold" } },
-        happiness: { filledTrack: { bg: "resource.happiness" } },
-      },
-      sizes: {
-        sm: {
-          track: { h: "8px" },
-          filledTrack: { h: "8px" },
+        military: {
+          filledTrack: {
+            bg: "status.danger",
+          },
         },
-        md: {
-          track: { h: "16px" },
-          filledTrack: { h: "16px" },
+        cultural: {
+          filledTrack: {
+            bg: "resource.culture",
+          },
+        },
+        wonder: {
+          filledTrack: {
+            bg: "accent.main",
+          },
         },
       },
       defaultProps: {
         size: "sm",
-        variant: "info",
+        variant: "military",
+      },
+    },
+
+    // Victory and defeat screen modals
+    Modal: {
+      baseStyle: {
+        overlay: {
+          bg: "rgba(0, 0, 0, 0.75)",
+          backdropFilter: "blur(3px)",
+        },
+        dialog: {
+          bg: "background.panel",
+          borderRadius: "md",
+          boxShadow: "0 0 20px rgba(0, 0, 0, 0.5)",
+        },
+        header: {
+          fontFamily: "heading",
+          color: "accent.main",
+        },
+        body: {
+          color: "text.primary",
+        },
       },
     },
   },
