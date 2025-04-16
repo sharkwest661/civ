@@ -1,4 +1,4 @@
-// src/stores/workersStore.js
+// src/stores/workersStore.js - Fixed version
 import { create } from "zustand";
 import { WORKER_SPECIALIZATIONS } from "../constants/gameConstants";
 
@@ -11,7 +11,7 @@ import { WORKER_SPECIALIZATIONS } from "../constants/gameConstants";
  * - Worker specializations
  * - Worker productivity
  *
- * Fixed to correctly track available worker count
+ * Fixed to correctly track specializations and worker growth
  */
 export const useWorkersStore = create((set, get) => ({
   // Total worker count
@@ -27,7 +27,7 @@ export const useWorkersStore = create((set, get) => ({
   // Format: { territoryId: { buildingIndex: ["worker_1", "worker_2"] } }
   assignedWorkers: {},
 
-  // Worker specializations
+  // Worker specializations - FIXED to ensure consistent mapping
   // Format: { workerId: { type: "diligent", subtype: "farming", bonus: 0.15 } }
   workerSpecializations: {},
 
@@ -35,7 +35,23 @@ export const useWorkersStore = create((set, get) => ({
   // Format: { workerId: true }
   recentlyReassigned: {},
 
+  // Worker growth trackers
+  workerGrowthProgress: 0, // Current progress towards next worker
+  workerGrowthThreshold: 20, // Food needed for next worker
+
   // Worker Actions
+
+  /**
+   * Update worker growth progress
+   * @param {number} newProgress - New progress value
+   * @param {number} newThreshold - New threshold value (optional)
+   */
+  updateWorkerGrowth: (newProgress, newThreshold = null) => {
+    set((state) => ({
+      workerGrowthProgress: newProgress,
+      workerGrowthThreshold: newThreshold || state.workerGrowthThreshold,
+    }));
+  },
 
   /**
    * Assign a worker to a building
@@ -193,7 +209,8 @@ export const useWorkersStore = create((set, get) => ({
 
     set((state) => {
       // Generate unique ID based on timestamp and random number
-      newWorkerId = `worker_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      newWorkerId = `worker_${state.totalWorkerCount + 1}`;
+      console.log("Adding new worker with ID:", newWorkerId);
 
       // Create updated workers lists
       const updatedAvailableWorkers = [
@@ -201,29 +218,41 @@ export const useWorkersStore = create((set, get) => ({
         { id: newWorkerId },
       ];
 
-      // Check if new worker gets a specialization (25% chance)
+      // Check if new worker gets a specialization (50% chance - INCREASED from 25%)
       const updatedSpecializations = { ...state.workerSpecializations };
 
-      if (Math.random() < 0.25) {
-        // Select specialization type
-        const specializationTypes = Object.keys(WORKER_SPECIALIZATIONS);
-        const selectedType =
-          specializationTypes[
-            Math.floor(Math.random() * specializationTypes.length)
-          ];
+      // GUARANTEED specialization for better gameplay
+      // Select specialization type
+      const specializationTypes = Object.keys(WORKER_SPECIALIZATIONS);
+      const selectedType =
+        specializationTypes[
+          Math.floor(Math.random() * specializationTypes.length)
+        ];
 
-        // Select specialization subtype
-        const subtypes = WORKER_SPECIALIZATIONS[selectedType].subtypes;
-        const selectedSubtype =
-          subtypes[Math.floor(Math.random() * subtypes.length)];
+      // Select specialization subtype
+      const subtypes = WORKER_SPECIALIZATIONS[selectedType].subtypes;
+      const selectedSubtype =
+        subtypes[Math.floor(Math.random() * subtypes.length)];
 
-        // Add specialization to worker
-        updatedSpecializations[newWorkerId] = {
-          type: selectedType,
-          subtype: selectedSubtype,
-          bonus: 0.15, // 15% bonus
-        };
-      }
+      // Add specialization to worker
+      updatedSpecializations[newWorkerId] = {
+        type: selectedType,
+        subtype: selectedSubtype,
+        bonus: 0.15, // 15% bonus
+      };
+
+      console.log(
+        "Worker",
+        newWorkerId,
+        "gets a specialization:",
+        updatedSpecializations[newWorkerId]
+      );
+
+      // Debug log all specializations
+      console.log("All worker specializations:", updatedSpecializations);
+
+      // Calculate new threshold for next worker
+      const newThreshold = Math.floor(20 + (state.totalWorkerCount + 1) * 5);
 
       return {
         totalWorkerCount: state.totalWorkerCount + 1,
@@ -231,138 +260,13 @@ export const useWorkersStore = create((set, get) => ({
         // Update the availableWorkerCount explicitly
         availableWorkerCount: updatedAvailableWorkers.length,
         workerSpecializations: updatedSpecializations,
+        // Reset progress toward next worker and set new threshold
+        workerGrowthProgress: 0,
+        workerGrowthThreshold: newThreshold,
       };
     });
 
     return newWorkerId;
-  },
-
-  /**
-   * Calculate resource production for workers in a building
-   * @param {string} territoryId - The territory ID
-   * @param {number} buildingIndex - The building index
-   * @param {string} buildingType - The building type
-   * @param {number} buildingLevel - The building level
-   * @returns {Object} Production data { type, amount }
-   */
-  calculateBuildingProduction: (
-    territoryId,
-    buildingIndex,
-    buildingType,
-    buildingLevel = 1
-  ) => {
-    const state = get();
-
-    // Get workers assigned to this building
-    const workers = state.assignedWorkers[territoryId]?.[buildingIndex] || [];
-    if (workers.length === 0) return { type: null, amount: 0 };
-
-    // Base production values per worker
-    const baseProductionValues = {
-      farm: { type: "food", amount: 5 },
-      mine: { type: "production", amount: 5 },
-      library: { type: "science", amount: 5 },
-      market: { type: "gold", amount: 5 },
-    };
-
-    // Get base production for this building type
-    const baseProduction = baseProductionValues[buildingType] || {
-      type: "food",
-      amount: 0,
-    };
-
-    // Calculate building level multiplier
-    const levelMultiplier =
-      buildingLevel === 1 ? 1 : buildingLevel === 2 ? 1.5 : 2;
-
-    // Calculate production for each worker
-    let totalProduction = 0;
-
-    workers.forEach((workerId) => {
-      // Base production per worker
-      let workerProduction = baseProduction.amount;
-
-      // Apply specialization bonus if applicable
-      const specialization = state.workerSpecializations[workerId];
-      if (specialization) {
-        // Map building types to worker specializations
-        const resourceMapping = {
-          farm: "farming",
-          mine: "production",
-          library: "science",
-          market: "gold",
-        };
-
-        const buildingResource = resourceMapping[buildingType];
-
-        // Apply bonus if worker specialization matches building resource
-        if (
-          specialization.type === "diligent" &&
-          specialization.subtype === buildingResource
-        ) {
-          workerProduction *= 1 + specialization.bonus;
-        }
-      }
-
-      // Apply penalty for recently reassigned workers
-      if (state.recentlyReassigned[workerId]) {
-        workerProduction *= 0.5;
-      }
-
-      // Add to total
-      totalProduction += workerProduction;
-    });
-
-    // Apply building level multiplier
-    totalProduction *= levelMultiplier;
-
-    return {
-      type: baseProduction.type,
-      amount: totalProduction,
-    };
-  },
-
-  /**
-   * Get all building production values
-   * @param {Object} territories - Map of territories
-   * @returns {Object} Map of resource types to production amounts
-   */
-  getAllBuildingProduction: (territories) => {
-    const state = get();
-    const production = {};
-
-    // Go through all assigned workers
-    Object.entries(state.assignedWorkers).forEach(
-      ([territoryId, buildings]) => {
-        const territory = territories[territoryId] || {};
-
-        Object.entries(buildings).forEach(([buildingIndex, workers]) => {
-          const buildingIndex_num = parseInt(buildingIndex, 10);
-
-          if (territory.buildings && territory.buildings[buildingIndex_num]) {
-            const building = territory.buildings[buildingIndex_num];
-
-            // Calculate production for this building
-            const buildingProduction = state.calculateBuildingProduction(
-              territoryId,
-              buildingIndex,
-              building.type,
-              building.level || 1
-            );
-
-            // Add to total
-            if (buildingProduction.type) {
-              if (!production[buildingProduction.type]) {
-                production[buildingProduction.type] = 0;
-              }
-              production[buildingProduction.type] += buildingProduction.amount;
-            }
-          }
-        });
-      }
-    );
-
-    return production;
   },
 
   /**
@@ -378,8 +282,8 @@ export const useWorkersStore = create((set, get) => ({
       const workerId = `worker_${i + 1}`;
       initialWorkers.push({ id: workerId });
 
-      // Give some initial workers specializations (25% chance)
-      if (Math.random() < 0.25) {
+      // GUARANTEED specialization for first worker, 40% chance for others
+      if (i === 0 || Math.random() < 0.4) {
         // Select specialization type randomly
         const specializationTypes = Object.keys(WORKER_SPECIALIZATIONS);
         const selectedTypeKey =
@@ -400,8 +304,17 @@ export const useWorkersStore = create((set, get) => ({
           subtype: selectedSubtype,
           bonus: 0.15, // 15% bonus
         };
+
+        console.log(
+          "Worker",
+          workerId,
+          "gets a specialization:",
+          specializations[workerId]
+        );
       }
     }
+
+    console.log("All worker specializations:", specializations);
 
     set({
       totalWorkerCount: count,
@@ -411,7 +324,13 @@ export const useWorkersStore = create((set, get) => ({
       assignedWorkers: {},
       workerSpecializations: specializations,
       recentlyReassigned: {},
+      // Initialize worker growth
+      workerGrowthProgress: 0,
+      workerGrowthThreshold: 20 + count * 5,
     });
+
+    // Debug log the state after setting
+    console.log("Worker store state after initialization:", get());
   },
 
   /**

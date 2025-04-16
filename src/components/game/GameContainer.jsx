@@ -137,10 +137,32 @@ const GameContainer = () => {
     [setPhase]
   );
 
-  // Toggle side panel - memoize with useCallback
+  // Updated toggleSidePanel function for GameContainer.jsx
+
   const toggleSidePanel = useCallback(
     (panel) => {
+      // Determine if we're opening a new panel
+      const isOpening = activeSidePanel !== panel;
+
+      // Update active panel state
       setActiveSidePanel((prev) => (prev === panel ? null : panel));
+
+      // If opening a panel, update the game phase to match
+      if (isOpening && panel) {
+        // Map from panel names to phase names
+        const panelToPhaseMap = {
+          workers: "Assignment",
+          building: "Building",
+          tech: "Research",
+          military: "Military",
+          diplomacy: "Diplomacy",
+        };
+
+        // Update the game phase
+        if (panelToPhaseMap[panel]) {
+          setPhase(panelToPhaseMap[panel]);
+        }
+      }
 
       // Announce panel toggle for screen readers
       const announcer = document.getElementById("panel-announcer");
@@ -162,7 +184,7 @@ const GameContainer = () => {
         announcer.textContent = `${action} ${panelName} panel`;
       }
     },
-    [activeSidePanel]
+    [activeSidePanel, setPhase]
   );
 
   // Get phase button variant based on current phase
@@ -430,7 +452,10 @@ const GameContainer = () => {
           )}
         </Flex>
 
-        <TurnControls onEndTurn={handleEndTurn} />
+        <TurnControls
+          onEndTurn={handleEndTurn}
+          onOpenResearch={() => handlePhaseChange("Research")}
+        />
       </Flex>
 
       {/* Screen reader announcement regions */}

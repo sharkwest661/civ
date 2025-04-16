@@ -1,5 +1,4 @@
-// src/components/military/MilitaryPanel-Fix.jsx
-// (Updated import statement to use TacticalCardSelector)
+// src/components/military/MilitaryPanel.jsx
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Box,
@@ -39,12 +38,13 @@ import { useResourcesStore } from "../../stores/resourcesStore";
 import { useMapStore } from "../../stores/mapStore";
 import SharedButton from "../ui/SharedButton";
 import TrainUnitPanel from "./TrainUnitPanel";
-import TacticalCardSelector from "./TacticalCardSelector"; // CORRECTED IMPORT HERE
+import TacticalCardSelector from "./TacticalCardSelector";
 import CombatPanel from "./CombatPanel";
-import { hexToId } from "../../utils/hexUtils";
+import { hexToId, getNeighbors } from "../../utils/hexUtils";
 
 /**
  * MilitaryPanel component - Main interface for military management
+ * Updated with improved Attack tab and better territory selection
  */
 const MilitaryPanel = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -79,10 +79,8 @@ const MilitaryPanel = ({ onClose }) => {
   const mapSelectedTerritory = useMapStore((state) => state.selectedTerritory);
   const setTerritoryOwner = useMapStore((state) => state.setTerritoryOwner);
 
-  // Rest of the component unchanged...
-
   // When map selection changes, update local state
-  React.useEffect(() => {
+  useEffect(() => {
     if (mapSelectedTerritory) {
       setSelectedTerritory(mapSelectedTerritory);
     }
@@ -488,6 +486,218 @@ const MilitaryPanel = ({ onClose }) => {
     );
   };
 
+  // Attack tab with improved implementation
+  const renderAttackTab = () => {
+    // Early return for no territory selected or no units
+    if (!selectedTerritory || selectedTerritoryUnits.length === 0) {
+      return (
+        <Box>
+          <Heading size="md" mb={4} color="accent.main">
+            Launch Attack
+          </Heading>
+
+          <Box bg="background.ui" p={4} borderRadius="md" mb={4}>
+            <Flex align="center" color="status.warning">
+              <Icon as={AlertTriangle} mr={2} />
+              <Text>
+                {!selectedTerritory
+                  ? "No territory selected."
+                  : "No military units in selected territory."}
+              </Text>
+            </Flex>
+            <Text color="text.secondary" fontSize="sm" mt={2}>
+              {!selectedTerritory
+                ? "Select a territory to launch an attack from."
+                : "Train military units before launching an attack."}
+            </Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    // Get adjacent territories from the hex utils
+    const adjacentHexes = getNeighbors({
+      q: selectedTerritory.q,
+      r: selectedTerritory.r,
+    });
+    const adjacentTerritoryIds = adjacentHexes.map((hex) => hexToId(hex));
+
+    // Filter to only include territories that exist and aren't owned by player
+    const validTargets = adjacentTerritoryIds
+      .filter((id) => territories[id])
+      .filter(
+        (id) => !territories[id].owner || territories[id].owner !== "player1"
+      )
+      .map((id) => ({
+        id,
+        territory: territories[id],
+        units: getUnitsInTerritory(id),
+      }));
+
+    // Calculate military strength for attacking territory
+    const attackerStrength = selectedTerritoryUnits.reduce((total, unit) => {
+      return total + (unitTypes[unit.type]?.strength || 0);
+    }, 0);
+
+    return (
+      <Box>
+        <Heading size="md" mb={4} color="accent.main">
+          Launch Attack
+        </Heading>
+
+        {/* Source territory info */}
+        <Box bg="background.ui" p={3} borderRadius="md" mb={4}>
+          <Flex align="center" mb={2}>
+            <Icon as={MapPin} mr={2} />
+            <Text color="text.primary">
+              Attack from:{" "}
+              {territory?.type
+                ? territory.type.charAt(0).toUpperCase() +
+                  territory.type.slice(1)
+                : "Unknown"}
+              {territory?.isCapital ? " (Capital)" : ""} ({selectedTerritory.q},{" "}
+              {selectedTerritory.r})
+            </Text>
+          </Flex>
+
+          <Flex align="center" justify="space-between" mt={2}>
+            <Text fontSize="sm" color="text.secondary">
+              Military strength:
+            </Text>
+            <Badge colorScheme="blue" px={2} py={1}>
+              <Flex align="center" gap={1}>
+                <Icon as={Sword} size={14} />
+                <Text>{attackerStrength}</Text>
+              </Flex>
+            </Badge>
+          </Flex>
+        </Box>
+
+        {validTargets.length === 0 ? (
+          <Box bg="background.ui" p={4} borderRadius="md" textAlign="center">
+            <Text color="text.secondary">
+              No valid targets for attack. Move units to a territory adjacent to
+              enemy territories.
+            </Text>
+          </Box>
+        ) : (
+          <>
+            <Text fontSize="sm" color="text.secondary" mb={3}>
+              Select a target territory to attack:
+            </Text>
+
+            <VStack spacing={3} align="stretch">
+              {validTargets.map(({ id, territory, units }) => {
+                // Calculate defender strength
+                const defenderStrength = units.reduce((total, unit) => {
+                  return total + (unitTypes[unit.type]?.strength || 0);
+                }, 0);
+
+                // Calculate simple strength ratio for quick assessment
+                const strengthRatio =
+                  attackerStrength / Math.max(1, defenderStrength);
+                let combatAssessment;
+                let assessmentColor;
+
+                if (strengthRatio >= 2) {
+                  combatAssessment = "Overwhelmingly Favorable";
+                  assessmentColor = "green";
+                } else if (strengthRatio >= 1.5) {
+                  combatAssessment = "Favorable";
+                  assessmentColor = "green";
+                } else if (strengthRatio >= 1) {
+                  combatAssessment = "Slightly Favorable";
+                  assessmentColor = "yellow";
+                } else if (strengthRatio >= 0.75) {
+                  combatAssessment = "Balanced";
+                  assessmentColor = "yellow";
+                } else if (strengthRatio >= 0.5) {
+                  combatAssessment = "Unfavorable";
+                  assessmentColor = "red";
+                } else {
+                  combatAssessment = "Very Unfavorable";
+                  assessmentColor = "red";
+                }
+
+                return (
+                  <Box
+                    key={id}
+                    bg="background.ui"
+                    p={3}
+                    borderRadius="md"
+                    borderWidth="1px"
+                    borderColor={
+                      territory.isUnderAttack ? "status.danger" : "transparent"
+                    }
+                  >
+                    <Flex justify="space-between" align="center" mb={2}>
+                      <Flex align="center">
+                        <Icon as={MapPin} mr={2} />
+                        <Text color="text.primary">
+                          {territory.type
+                            ? territory.type.charAt(0).toUpperCase() +
+                              territory.type.slice(1)
+                            : "Unknown"}
+                          {territory.isCapital ? " (Capital)" : ""}
+                        </Text>
+                      </Flex>
+                      <Badge
+                        colorScheme={territory.owner ? "red" : "gray"}
+                        px={2}
+                      >
+                        {territory.owner ? "Enemy" : "Neutral"}
+                      </Badge>
+                    </Flex>
+
+                    {/* Combat assessment */}
+                    <Box bg="background.panel" p={2} borderRadius="md" mb={3}>
+                      <Flex justify="space-between" align="center">
+                        <HStack spacing={3}>
+                          <Badge colorScheme="blue" px={2} py={1}>
+                            <Flex align="center" gap={1}>
+                              <Icon as={Sword} size={14} />
+                              <Text>{attackerStrength}</Text>
+                            </Flex>
+                          </Badge>
+                          <Text fontSize="sm">vs</Text>
+                          <Badge colorScheme="red" px={2} py={1}>
+                            <Flex align="center" gap={1}>
+                              <Icon as={Shield} size={14} />
+                              <Text>{defenderStrength}</Text>
+                            </Flex>
+                          </Badge>
+                        </HStack>
+                        <Badge colorScheme={assessmentColor}>
+                          {combatAssessment}
+                        </Badge>
+                      </Flex>
+                    </Box>
+
+                    <Flex justify="space-between" align="center">
+                      <Text fontSize="sm" color="text.secondary">
+                        {units.length > 0
+                          ? `Defending units: ${units.length}`
+                          : "No defending units"}
+                      </Text>
+                      <SharedButton
+                        size="sm"
+                        variant="danger"
+                        onClick={() => handleInitiateCombat(id)}
+                        leftIcon={<Icon as={Sword} boxSize={4} />}
+                      >
+                        Attack
+                      </SharedButton>
+                    </Flex>
+                  </Box>
+                );
+              })}
+            </VStack>
+          </>
+        )}
+      </Box>
+    );
+  };
+
   return (
     <Box p={4}>
       <Flex justify="space-between" align="center" mb={4}>
@@ -539,180 +749,7 @@ const MilitaryPanel = ({ onClose }) => {
 
           {/* Attack Tab */}
           <TabPanel p={0} pt={4}>
-            <Box>
-              <Heading size="md" mb={4} color="accent.main">
-                Launch Attack
-              </Heading>
-
-              {!selectedTerritory || selectedTerritoryUnits.length === 0 ? (
-                <Box bg="background.ui" p={4} borderRadius="md" mb={4}>
-                  <Flex align="center" color="status.warning">
-                    <Icon as={AlertTriangle} mr={2} />
-                    <Text>
-                      {!selectedTerritory
-                        ? "No territory selected."
-                        : "No military units in selected territory."}
-                    </Text>
-                  </Flex>
-                  <Text color="text.secondary" fontSize="sm" mt={2}>
-                    {!selectedTerritory
-                      ? "Select a territory to launch an attack from."
-                      : "Train military units before launching an attack."}
-                  </Text>
-                </Box>
-              ) : (
-                <>
-                  <Box bg="background.ui" p={3} borderRadius="md" mb={4}>
-                    <Flex align="center" mb={2}>
-                      <Icon as={MapPin} mr={2} />
-                      <Text color="text.primary">
-                        Attack from:{" "}
-                        {territory?.type
-                          ? territory.type.charAt(0).toUpperCase() +
-                            territory.type.slice(1)
-                          : "Unknown"}
-                        {territory?.isCapital ? " (Capital)" : ""} (
-                        {selectedTerritory.q}, {selectedTerritory.r})
-                      </Text>
-                    </Flex>
-
-                    <Text fontSize="sm" color="text.secondary" mb={2}>
-                      Attacking forces:
-                    </Text>
-                    <Flex gap={2} wrap="wrap">
-                      {Object.entries(
-                        selectedTerritoryUnits.reduce((counts, unit) => {
-                          counts[unit.type] = (counts[unit.type] || 0) + 1;
-                          return counts;
-                        }, {})
-                      ).map(([type, count]) => (
-                        <Badge
-                          key={type}
-                          colorScheme={
-                            type === "warrior"
-                              ? "gray"
-                              : type === "archer"
-                              ? "green"
-                              : type === "horseman"
-                              ? "yellow"
-                              : "purple"
-                          }
-                          display="flex"
-                          alignItems="center"
-                          px={2}
-                          py={1}
-                        >
-                          <Text mr={1}>{unitTypes[type]?.icon}</Text>
-                          {unitTypes[type]?.name}: {count}
-                        </Badge>
-                      ))}
-                    </Flex>
-                  </Box>
-
-                  <Heading size="sm" mb={3} color="text.primary">
-                    Select Target Territory
-                  </Heading>
-
-                  {/* List of adjacent territories */}
-                  <VStack spacing={3} align="stretch">
-                    {Object.entries(territories)
-                      .filter(([id, territory]) => {
-                        // Filter for adjacent territories that aren't owned by the player
-                        // This would need proper adjacency checking
-                        if (territory.owner === "player1") return false;
-
-                        // In a real implementation we would check adjacency properly
-                        // For now just show all non-player territories
-                        return true;
-                      })
-                      .map(([id, territory]) => {
-                        const defenderUnits = getUnitsInTerritory(id);
-
-                        return (
-                          <Box
-                            key={id}
-                            bg="background.ui"
-                            p={3}
-                            borderRadius="md"
-                            borderWidth="1px"
-                            borderColor={
-                              territory.isUnderAttack
-                                ? "status.danger"
-                                : "transparent"
-                            }
-                          >
-                            <Flex justify="space-between" align="center" mb={2}>
-                              <Flex align="center">
-                                <Icon as={MapPin} mr={2} />
-                                <Text color="text.primary">
-                                  {territory.type
-                                    ? territory.type.charAt(0).toUpperCase() +
-                                      territory.type.slice(1)
-                                    : "Unknown"}
-                                  {territory.isCapital ? " (Capital)" : ""}
-                                </Text>
-                              </Flex>
-                              <Badge
-                                colorScheme={territory.owner ? "red" : "gray"}
-                                px={2}
-                              >
-                                {territory.owner ? "Enemy" : "Neutral"}
-                              </Badge>
-                            </Flex>
-
-                            {/* Defender units if known */}
-                            {defenderUnits.length > 0 && (
-                              <Box mt={2} mb={3}>
-                                <Text
-                                  fontSize="sm"
-                                  color="text.secondary"
-                                  mb={1}
-                                >
-                                  Defending forces:
-                                </Text>
-                                <Flex gap={2} wrap="wrap">
-                                  {Object.entries(
-                                    defenderUnits.reduce((counts, unit) => {
-                                      counts[unit.type] =
-                                        (counts[unit.type] || 0) + 1;
-                                      return counts;
-                                    }, {})
-                                  ).map(([type, count]) => (
-                                    <Badge
-                                      key={type}
-                                      colorScheme="red"
-                                      display="flex"
-                                      alignItems="center"
-                                      px={2}
-                                      py={1}
-                                    >
-                                      <Text mr={1}>
-                                        {unitTypes[type]?.icon}
-                                      </Text>
-                                      {unitTypes[type]?.name}: {count}
-                                    </Badge>
-                                  ))}
-                                </Flex>
-                              </Box>
-                            )}
-
-                            <Flex justify="flex-end">
-                              <SharedButton
-                                size="sm"
-                                variant="danger"
-                                onClick={() => handleInitiateCombat(id)}
-                                leftIcon={<Icon as={Sword} boxSize={4} />}
-                              >
-                                Attack
-                              </SharedButton>
-                            </Flex>
-                          </Box>
-                        );
-                      })}
-                  </VStack>
-                </>
-              )}
-            </Box>
+            {renderAttackTab()}
           </TabPanel>
         </TabPanels>
       </Tabs>

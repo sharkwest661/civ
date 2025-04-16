@@ -1,5 +1,5 @@
-// src/App.jsx - Updated with military integration
-import React, { useEffect, useState, useCallback } from "react";
+// src/App.jsx - Fixed infinite update cycle
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   ChakraProvider,
   Flex,
@@ -10,13 +10,13 @@ import {
 } from "@chakra-ui/react";
 import GameContainer from "./components/game/GameContainer";
 import ErrorBoundary from "./components/common/ErrorBoundary";
-import GameIntegration from "./components/game/GameIntegration"; // Added for military integration
+import GameIntegration from "./components/game/GameIntegration";
 import { useGameStore } from "./stores/gameStore";
 import { useMapStore } from "./stores/mapStore";
 import { useResourcesStore } from "./stores/resourcesStore";
 import { useTechnologyStore } from "./stores/technologyStore";
 import { useWorkersStore } from "./stores/workersStore";
-import { useMilitaryStore } from "./stores/militaryStore"; // Added for military system
+import { useMilitaryStore } from "./stores/militaryStore";
 import { theme } from "./theme";
 import { SkipToMainContent } from "./components/accessibility/AccessibilityComponents";
 
@@ -24,6 +24,9 @@ function App() {
   // State for tracking initialization
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState(null);
+
+  // Use a ref to track if we've processed a turn change already
+  const processedTurnRef = useRef({});
 
   // Access stores with individual selectors
   const startGame = useGameStore((state) => state.startGame);
@@ -94,20 +97,31 @@ function App() {
     initializeMap,
     initializeResources,
     initializeWorkers,
-    initializeMilitary, // Added to dependency array
+    initializeMilitary,
     startGame,
   ]);
 
   // Update research progress when turn changes with error handling
+  // Fixed to prevent infinite update loops
   useEffect(() => {
-    if (currentTurn > 1 && currentResearch) {
-      try {
-        // Get current science production
-        const scienceProduction = 2; // This would come from your resources store
-        updateResearchProgress(scienceProduction);
-      } catch (error) {
-        console.error("Error updating research progress:", error);
-      }
+    // Skip if we've already processed this turn or if there's no research
+    if (
+      currentTurn <= 1 ||
+      !currentResearch ||
+      processedTurnRef.current[currentTurn]
+    ) {
+      return;
+    }
+
+    // Mark that we've processed this turn
+    processedTurnRef.current[currentTurn] = true;
+
+    try {
+      // Get current science production - fixed hardcoded value
+      const scienceProduction = 2;
+      updateResearchProgress(scienceProduction);
+    } catch (error) {
+      console.error("Error updating research progress:", error);
     }
   }, [currentTurn, currentResearch, updateResearchProgress]);
 
