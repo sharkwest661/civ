@@ -51,12 +51,7 @@ export const useResourcesStore = create((set, get) => ({
     storage: Infinity,
   },
 
-  // Influence resource
-  influence: {
-    amount: 0,
-    production: 0.5,
-    storage: Infinity,
-  },
+  // Removed influence resource
 
   // Special Resources with flattened structure
   strategicResources: {}, // iron, horses, etc.
@@ -234,7 +229,7 @@ export const useResourcesStore = create((set, get) => ({
       gold: state.gold.amount,
       happiness: state.happiness.amount,
       culture: state.culture.amount,
-      influence: state.influence.amount,
+      // Removed influence
     };
   },
 
@@ -249,7 +244,7 @@ export const useResourcesStore = create((set, get) => ({
       gold: state.gold.production,
       happiness: state.happiness.production,
       culture: state.culture.production,
-      influence: state.influence.production,
+      // Removed influence
     };
   },
 

@@ -1,4 +1,4 @@
-// src/components/game/GameContainer.jsx - Updated with Military Panel integration
+// src/components/game/GameContainer.jsx
 import React, { useState, useCallback } from "react";
 import {
   Box,
@@ -15,7 +15,7 @@ import {
   Building,
   FlaskConical,
   Sword,
-  MessageCircle,
+  // MessageCircle, // Removed import
 } from "lucide-react";
 import MapView from "../map/MapView";
 import ResourcePanel from "../resources/ResourcePanel";
@@ -23,7 +23,7 @@ import TurnControls from "./TurnControls";
 import BuildingPanel from "../buildings/BuildingPanel";
 import TechnologyTree from "../technology/TechnologyTree";
 import WorkerAssignmentPanel from "../workers/WorkerAssignmentPanel";
-import MilitaryPanel from "../military/MilitaryPanel"; // Import the Military Panel
+import MilitaryPanel from "../military/MilitaryPanel";
 import SharedButton from "../ui/SharedButton";
 import { useGameStore } from "../../stores/gameStore";
 import { useMapStore } from "../../stores/mapStore";
@@ -35,7 +35,7 @@ import { ScreenReaderAnnouncer } from "../accessibility/AccessibilityComponents"
  */
 const GameContainer = () => {
   // Component state
-  const [activeSidePanel, setActiveSidePanel] = useState(null); // null, "building", "tech", "military", "diplomacy", "workers"
+  const [activeSidePanel, setActiveSidePanel] = useState(null); // null, "building", "tech", "military", "workers"
 
   // IMPORTANT: Use individual selectors for each piece of state to prevent unnecessary re-renders
   // Game store selectors
@@ -121,9 +121,6 @@ const GameContainer = () => {
         case "Military":
           setActiveSidePanel("military"); // Set the military panel as active
           break;
-        case "Diplomacy":
-          setActiveSidePanel("diplomacy");
-          break;
         default:
           setActiveSidePanel(null);
       }
@@ -155,7 +152,6 @@ const GameContainer = () => {
           building: "Building",
           tech: "Research",
           military: "Military",
-          diplomacy: "Diplomacy",
         };
 
         // Update the game phase
@@ -177,8 +173,6 @@ const GameContainer = () => {
             ? "Technology"
             : panel === "military"
             ? "Military"
-            : panel === "diplomacy"
-            ? "Diplomacy"
             : "";
 
         announcer.textContent = `${action} ${panelName} panel`;
@@ -206,8 +200,6 @@ const GameContainer = () => {
         return FlaskConical;
       case "Military":
         return Sword;
-      case "Diplomacy":
-        return MessageCircle;
       default:
         return null;
     }
@@ -235,27 +227,6 @@ const GameContainer = () => {
       case "military":
         // Render the MilitaryPanel component
         return <MilitaryPanel onClose={() => setActiveSidePanel(null)} />;
-
-      case "diplomacy":
-        return (
-          <Box p={4}>
-            <Flex justify="space-between" align="center" mb={4}>
-              <Heading size="md" color="accent.main">
-                Diplomacy Panel
-              </Heading>
-              <SharedButton
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveSidePanel(null)}
-              >
-                ✕
-              </SharedButton>
-            </Flex>
-            <Text color="text.secondary">
-              Diplomacy panel would be implemented here.
-            </Text>
-          </Box>
-        );
 
       default:
         return (
@@ -299,15 +270,6 @@ const GameContainer = () => {
                 ariaLabel="Open military operations panel"
               >
                 Military Operations
-              </SharedButton>
-
-              <SharedButton
-                onClick={() => toggleSidePanel("diplomacy")}
-                variant="secondary"
-                leftIcon={<Icon as={MessageCircle} boxSize={5} />}
-                ariaLabel="Open diplomacy panel"
-              >
-                Diplomacy
               </SharedButton>
             </VStack>
 
@@ -430,26 +392,24 @@ const GameContainer = () => {
       >
         <Flex gap={2}>
           {/* Phase buttons */}
-          {["Assignment", "Building", "Research", "Military", "Diplomacy"].map(
-            (phase) => {
-              const PhaseIcon = getPhaseIcon(phase);
-              return (
-                <SharedButton
-                  key={phase}
-                  onClick={() => handlePhaseChange(phase)}
-                  variant={getPhaseButtonVariant(phase)}
-                  size="sm"
-                  leftIcon={PhaseIcon && <PhaseIcon size={16} />}
-                  ariaLabel={`Change to ${phase} phase${
-                    currentPhase === phase ? " (current phase)" : ""
-                  }`}
-                  aria-pressed={currentPhase === phase}
-                >
-                  {phase}
-                </SharedButton>
-              );
-            }
-          )}
+          {["Assignment", "Building", "Research", "Military"].map((phase) => {
+            const PhaseIcon = getPhaseIcon(phase);
+            return (
+              <SharedButton
+                key={phase}
+                onClick={() => handlePhaseChange(phase)}
+                variant={getPhaseButtonVariant(phase)}
+                size="sm"
+                leftIcon={PhaseIcon && <PhaseIcon size={16} />}
+                ariaLabel={`Change to ${phase} phase${
+                  currentPhase === phase ? " (current phase)" : ""
+                }`}
+                aria-pressed={currentPhase === phase}
+              >
+                {phase}
+              </SharedButton>
+            );
+          })}
         </Flex>
 
         <TurnControls

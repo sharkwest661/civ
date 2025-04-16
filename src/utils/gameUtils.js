@@ -134,6 +134,7 @@ export const getResourceDisplay = (resourceType) => {
  * @param {string} resourceType - The resource type
  * @returns {string} The Chakra UI color key for the resource
  */
+
 export const getResourceColor = (resourceType) => {
   const resourceMapping = {
     food: "resource.food",
@@ -142,7 +143,7 @@ export const getResourceColor = (resourceType) => {
     gold: "resource.gold",
     happiness: "resource.happiness",
     culture: "resource.culture",
-    influence: "resource.influence",
+    // Removed influence mapping
     farm: "resource.food",
     mine: "resource.production",
     library: "resource.science",

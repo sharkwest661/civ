@@ -13,7 +13,7 @@ import { create } from "zustand";
 export const useGameStore = create((set, get) => ({
   // Game state
   currentTurn: 1,
-  currentPhase: "Assignment", // Assignment, Building, Research, Military, Diplomacy
+  currentPhase: "Assignment", // Assignment, Building, Research, Military
   gameStarted: false,
   gamePaused: false,
   gameEnded: false,
@@ -56,7 +56,7 @@ export const useGameStore = create((set, get) => ({
     victoryConditions: {
       military: true,
       cultural: true,
-      diplomatic: true,
+      // Removed diplomatic victory condition
       wonder: true,
     },
   },
